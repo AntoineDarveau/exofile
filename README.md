@@ -1,8 +1,14 @@
 # Tools to generate and access the masterfile
 masterfile is based on the exoplanet archive tables.
+The masterfile and the reference table are available at http://www.astro.umontreal.ca/~adb/
 
 Contributors:
 -------------
 - Antoine Darveau-Bernier
 - Merrin Peterson
 
+Concept
+-------
+The idea is to make the most complete table as possible.
+1. The [Confirmed Planet Table](https://exoplanetarchive.ipac.caltech.edu/docs/API_exoplanet_columns.html) is used to fill the masterfile. 
+2. Then, the [Extended Planet Table](https://exoplanetarchive.ipac.caltech.edu/docs/API_exomultpars_columns.html) is used. The references are sorted according to the error on the orbital period (this could be changed). All the values from a particular reference are used to keep a minimum of consistency.
