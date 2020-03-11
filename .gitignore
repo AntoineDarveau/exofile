@@ -1,3 +1,16 @@
+######################
+# Custom ignored files
+######################
+
+Tests_masterfile.ipynb
+private.py
+masterfile/param.yaml
+
+######################
+# Python related ignored files
+######################
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

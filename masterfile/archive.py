@@ -20,6 +20,8 @@ def get_refname_from_links(links):
 
 class MasterFile(Table):
     
+#     def read()
+    
     def mk_ref_table(self, ref_link=True, ref_col='mpl_reflink'):
         '''
         Return a table with the same structure as self, but with the 

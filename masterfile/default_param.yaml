@@ -1,0 +1,9 @@
+sheet_key:
+  Description: string, Key of the google sheet with custom values
+  Value: 
+url:
+  Description: string, Where to find the masterfile (url)
+  Value: 
+url_ref:
+  Description: string, Where to find the masterfiles references (url)
+  Value: 
