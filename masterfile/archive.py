@@ -29,7 +29,6 @@ class MasterFile(Table):
     
     main_col = 'pl_name'
     
-#     def read()
     
     def mk_ref_table(self, ref_link=True, ref_col='mpl_reflink'):
         '''
@@ -107,7 +106,9 @@ class MasterFile(Table):
     
     @staticmethod
     def update(verbose=True):
-        
+        '''
+        Returns an updated masterfile built with the NasaExoplanetArchive.
+        '''
         # Read new database from exoplanet archive 
         if verbose: print("Query Confirmed Planet Table...", end="")
         
@@ -179,7 +180,7 @@ class MasterFile(Table):
     def replace_with(self, other, key=None):
         '''
         Use all non-masked values of `other` to replace values in `self`.
-        `key`is the column use to identify corresponding rows.
+        `key` is the column use to identify corresponding rows.
         Default is other.main_col
         '''
 
@@ -250,7 +251,17 @@ class MasterFile(Table):
         return master
     
     @classmethod
-    def load(cls, custom_file=None, query=True, **kwargs):
+    def load(cls, custom_file=None, query=True):
+        '''
+        Returns the masterfile complemented.
+        Parameters
+        - custom_file: string
+            Name of the local file with custom values.
+            This will be use to replace values in the masterfile.
+            Default is the `custom_file` key word in param.yaml.
+        - query: bool
+            query or not the masterfile. If False, simply read `custom_file`
+        '''
 
         # Take custom_file from param is not given
         if custom_file is None:
