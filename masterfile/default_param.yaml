@@ -7,3 +7,6 @@ url:
 url_ref:
   Description: string, Where to find the masterfiles references (url)
   Value: 
+custom_file:
+  Description: string, Local masterfile. Will be used to complement the online masterfile
+  Value: masterfile_custom.csv

@@ -1,7 +1,14 @@
-from .table_custom import Table, MaskedColumn
+# Librairy imports
+from astropy.table import vstack
 import requests
 import re
 from numpy import where, array
+from warnings import warn
+
+# Local imports
+from .table_custom import Table, MaskedColumn
+from .config import Param
+from .exceptions import QueryFileWarning, GetCustomFileWarning
 
 
 def get_refname_from_link(link):
@@ -19,6 +26,8 @@ def get_refname_from_links(links):
     return [get_refname_from_link(link) for link in links]
 
 class MasterFile(Table):
+    
+    main_col = 'pl_name'
     
 #     def read()
     
@@ -78,11 +87,11 @@ class MasterFile(Table):
 
         return colnames
     
-    def mask_no_errors(self):
+    def mask_no_errors(self, **kwargs):
         '''
         Mask columns where errors are not available
         '''
-        for cols in self.get_colnames_with_error():
+        for cols in self.get_colnames_with_error(**kwargs):
 
             mask = self[cols].mask
             # Convert to regular array
@@ -166,8 +175,117 @@ class MasterFile(Table):
         if verbose: print('Done')
 
         return new, ref_table
-
     
+    def replace_with(self, other, key=None):
+        '''
+        Use all non-masked values of `other` to replace values in `self`.
+        `key`is the column use to identify corresponding rows.
+        Default is other.main_col
+        '''
+
+        # Take main_col if key is not given
+        key = key or other.main_col
+
+        # Get position in main table
+        index = self.get_index(*other[key], name_key=key)
+        index = np.array(index)
+
+        # Make new table for objects not in self (to be append later)
+        new = MasterFile(other[index == -1], copy=True)
+
+        # Remove new objects
+        i_old = (index != -1)
+        other = MasterFile(other[i_old], copy=True)
+        index = index[i_old]
+
+        # Replace values
+        for i_other, i_self in enumerate(index):
+            # Position of keys that are not masked
+            i_keys, = np.where(~np.array(list(other.mask[i_other])))
+
+            # Keys not masked
+            keys = [other.keys()[i_key] for i_key in i_keys]
+
+            # Don't change values for main column
+            keys.remove(key)
+
+            # Assign new values
+            self[i_self][keys] = other[i_other][keys]
+    
+        # Finally, add the new objects to self
+        for i_row in range(len(new)):
+            self.add_row(new[i_row][self.keys()])
+
+    @classmethod
+    def query(cls, **kwargs):
+        '''
+        Query the masterfile and try to complement it with
+        the custom table (google sheet).
+        Returns the complemented masterfile.
+        Parameters:
+        - url: string
+            adress of the masterfile
+        - sheet_key: string
+            Identification key of the google sheet
+        '''
+        # Get links to query the different database
+        param = Param.load().value
+        param = {**param, **kwargs}  # Use input arguments if given
+
+        # Get combined table
+        master = requests.get(param['url'])
+        # Convert to table
+        master = cls.read(master.text, format='ascii')
+
+        # Try to complement with custom values
+        try:
+            # Get custom values to be added to the masterfile
+            custom = GoogleSheet.query(param['sheet_key'], 'Data')
+            # Replace values in the masterfile
+            master.replace_with(custom)
+
+        except Exception as e:
+            warn(GetCustomFileWarning(err=e))
+
+        return master
+    
+    @classmethod
+    def load(cls, custom_file=None, query=True, **kwargs):
+
+        # Take custom_file from param is not given
+        if custom_file is None:
+            custom_file = Param.load().value['custom_file']
+
+        #############################################
+        # Simply return custom_file if query is False
+        #############################################
+        if not query:
+            return cls.read(custom_file)
+
+        #############################################
+        # else, query and complement with custom_file
+        #############################################
+
+        # Try to query the complemented masterfile.
+        # If impossible, simply return the local `custom_file`
+        try:
+            master = cls.query()
+
+        except Exception as e:
+            warn(QueryFileWarning(file='masterfile', err=e))
+            return cls.read(custom_file)
+
+        # Complement the complemented masterfile (lol) with
+        # the local `custom_file`
+        try:
+            custom = cls.read(custom_file)
+            master.replace_with(custom)
+        except Exception as e:
+            warn(GetCustomFileWarning(err=e))
+
+        return master
+
+
 class GoogleSheet(MasterFile):
     
     url_root = 'https://docs.google.com/spreadsheets/d/{}/gviz/tq?tqx=out:csv&sheet={}'
@@ -179,7 +297,21 @@ class GoogleSheet(MasterFile):
         
         data = requests.get(url)
         
-        return cls.read(data.text, format='ascii')
+        # Convert to astropy table
+        table = cls.read(data.text, format='ascii')
+        
+        # Remove units from the column name
+        # The structure is: "name [units]"
+        for key in table.keys():
+            # Split name and units
+            name, unit = key.split(' [')
+            unit = unit.split(']')[0]
+    
+            # Rename and assign units
+            table.rename_column(key, name)
+            table[name].unit = unit
+        
+        return table
     
 
 class BaseArchive(MasterFile):
@@ -201,7 +333,8 @@ class BaseArchive(MasterFile):
         data.correct_units(verbose=False)
         
         # Mask where errors are not available
-        data.mask_no_errors()
+        data.mask_no_errors()  # err1 and err2 cols
+        data.mask_no_errors(err_ext=['err'])  # err cols
         
         return data
     
