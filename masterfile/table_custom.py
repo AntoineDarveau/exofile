@@ -93,9 +93,16 @@ class Table(table.Table):
         for pl in plName:
             try:
                 position.append(int(self[name_key].find(pl)[0]))
+                
             except TypeError:
-                print('Wrong name or incomplete:')
-                print(self[name_key].find(pl))
+                values = ', '.join(self[name_key].find(pl)[1])
+                if values:
+                    raise ValueError(
+                        'Incomplete name. Possible values: '
+                        + values
+                    )
+                else:
+                    position.append(-1)
         
         return position
     
