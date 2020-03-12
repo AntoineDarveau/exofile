@@ -30,7 +30,7 @@ Setup
 -----
 Once the masterfile is cloned and properly referred to (like adding ` '/path/to/repository/masterfile/' ` to python's path or ` from sys import path; path.append('/path/to/repository/masterfile/')) `), the param file must be configurate. You can do so by simply running in python:
 ```python
-from masterfile import edit_param
+from masterfile.config import edit_param
 edit_param(sheet_key='key_of_the_google_sheet_for_custom_values',
            url='url_of_the_masterfile',
            url_ref='url_of_the_masterfile_references')
