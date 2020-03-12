@@ -189,7 +189,7 @@ class MasterFile(Table):
 
         # Get position in main table
         index = self.get_index(*other[key], name_key=key)
-        index = np.array(index)
+        index = array(index)
 
         # Make new table for objects not in self (to be append later)
         new = MasterFile(other[index == -1], copy=True)
@@ -202,7 +202,7 @@ class MasterFile(Table):
         # Replace values
         for i_other, i_self in enumerate(index):
             # Position of keys that are not masked
-            i_keys, = np.where(~np.array(list(other.mask[i_other])))
+            i_keys, = where(~array(list(other.mask[i_other])))
 
             # Keys not masked
             keys = [other.keys()[i_key] for i_key in i_keys]
@@ -218,7 +218,7 @@ class MasterFile(Table):
             self.add_row(new[i_row][self.keys()])
 
     @classmethod
-    def query(cls, **kwargs):
+    def query(cls, debug=False, **kwargs):
         '''
         Query the masterfile and try to complement it with
         the custom table (google sheet).
@@ -246,12 +246,13 @@ class MasterFile(Table):
             master.replace_with(custom)
 
         except Exception as e:
+            if debug: raise e
             warn(GetCustomFileWarning(err=e))
 
         return master
     
     @classmethod
-    def load(cls, custom_file=None, query=True):
+    def load(cls, custom_file=None, query=True, **kwargs):
         '''
         Returns the masterfile complemented.
         Parameters
@@ -261,6 +262,7 @@ class MasterFile(Table):
             Default is the `custom_file` key word in param.yaml.
         - query: bool
             query or not the masterfile. If False, simply read `custom_file`
+        - kwargs are passed to query() method 
         '''
 
         # Take custom_file from param is not given
@@ -280,7 +282,7 @@ class MasterFile(Table):
         # Try to query the complemented masterfile.
         # If impossible, simply return the local `custom_file`
         try:
-            master = cls.query()
+            master = cls.query(**kwargs)
 
         except Exception as e:
             warn(QueryFileWarning(file='masterfile', err=e))
