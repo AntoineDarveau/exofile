@@ -6,6 +6,8 @@ Contributors:
 -------------
 - Antoine Darveau-Bernier
 - Merrin Peterson
+- Charles Cadieux
+- Taylor Bell?
 
 Concept
 -------
