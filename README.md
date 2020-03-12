@@ -19,8 +19,7 @@ The resulting file can be used directly. It is also possible to complement this 
 4. a local custom table (default is csv file).
 
 To do so, simply use the following code:
-```
-python
+``` python
 from masterfile import MasterFile
 data = MasterFile.load()
 ```
