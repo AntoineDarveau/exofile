@@ -22,7 +22,7 @@ The resulting file can be used directly. It is also possible to complement this 
 
 To do so, simply use the following code:
 ``` python
-from masterfile import MasterFile
+from masterfile.archive import MasterFile
 data = MasterFile.load()
 ```
 
