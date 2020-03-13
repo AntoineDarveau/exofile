@@ -5,6 +5,7 @@
 Tests_masterfile.ipynb
 private.py
 masterfile/param.yaml
+old_masterfile_log.txt
 
 ######################
 # Python related ignored files
