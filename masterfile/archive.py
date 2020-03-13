@@ -8,7 +8,7 @@ from warnings import warn
 # Local imports
 from .table_custom import Table, MaskedColumn
 from .config import Param
-from .exceptions import QueryFileWarning, GetCustomFileWarning
+from .exceptions import QueryFileWarning, GetLocalFileWarning
 
 
 def get_refname_from_link(link):
@@ -52,6 +52,35 @@ class MasterFile(Table):
             refs = get_refname_from_links(self[ref_col])
         else:
             refs = MaskedColumn(self[ref_col], dtype='bytes')
+
+        # Put the ref in each columns
+        for key in keys:
+            out[key] = refs
+
+        out['pl_name'] = self['pl_name']  # Keep the planet name
+        out.mask = self.mask  #  Keep mask
+
+        return out
+    
+    def mk_unique_ref_table(self, ref='No Ref'):
+        '''
+        Return a table with the same structure as self, but with the 
+        name of the reference at each position.
+        
+        Parameters:
+        - ref_link: bool
+            Extract the reference name from a url link using
+            the function get_refname_from_links
+        - ref_col: string
+            Which column to use as the reference
+        '''
+    
+        # Initiate table with the same structure
+        keys = self.keys()
+        out = Table(names=keys, dtype=['bytes' for k in keys], masked=True, data=self.mask)
+
+        
+        refs = MaskedColumn([ref for lines in self], dtype='bytes')
 
         # Put the ref in each columns
         for key in keys:
@@ -218,7 +247,7 @@ class MasterFile(Table):
             self.add_row(new[i_row][self.keys()])
 
     @classmethod
-    def query(cls, debug=False, **kwargs):
+    def query(cls, url_key='url', debug=False, **kwargs):
         '''
         Query the masterfile and try to complement it with
         the custom table (google sheet).
@@ -226,77 +255,139 @@ class MasterFile(Table):
         Parameters:
         - url: string
             adress of the masterfile
+        - url_key: string
+            key to get the url from param file. Default is 'url'.
         - sheet_key: string
             Identification key of the google sheet
         '''
         # Get links to query the different database
         param = Param.load().value
-        param = {**param, **kwargs}  # Use input arguments if given
+        # Use input arguments if given
+        param = {**param, **kwargs.pop('param', {})}
 
         # Get combined table
-        master = requests.get(param['url'])
+        master = requests.get(param[url_key])
         # Convert to table
         master = cls.read(master.text, format='ascii')
 
         # Try to complement with custom values
         try:
             # Get custom values to be added to the masterfile
-            custom = GoogleSheet.query(param['sheet_key'], 'Data')
+            custom = GoogleSheet.query(param['sheet_key'], **kwargs)
             # Replace values in the masterfile
             master.replace_with(custom)
 
         except Exception as e:
             if debug: raise e
-            warn(GetCustomFileWarning(err=e))
+            warn(QueryFileWarning(file='google sheet', err=e))
 
         return master
     
     @classmethod
-    def load(cls, custom_file=None, query=True, **kwargs):
+    def load(cls, query=True, param=None, **kwargs):
         '''
         Returns the masterfile complemented.
         Parameters
-        - custom_file: string
-            Name of the local file with custom values.
-            This will be use to replace values in the masterfile.
-            Default is the `custom_file` key word in param.yaml.
+        - param: dict
+            dictionnairy of the local files names. Default is param file.
+            keys: 'masterfile' and 'custom_file'
+            `custom_file` will be use to replace values in the masterfile.
+            `masterfile` is the local masterfile.
         - query: bool
             query or not the masterfile. If False, simply read `custom_file`
         - kwargs are passed to query() method 
         '''
+        # Assign default values
+        if param is None: param = {}  #  Never put {} in the function definition
+        param = {**Param.load().value, **param}
 
-        # Take custom_file from param is not given
-        if custom_file is None:
-            custom_file = Param.load().value['custom_file']
-
-        #############################################
-        # Simply return custom_file if query is False
-        #############################################
+        ###########################
+        # Complement the masterfile
+        ###########################
+        # Query online if True
+        if query:
+            # Try to query the complemented masterfile.
+            # If impossible, set query to False
+            try:
+                master = cls.query(**kwargs)
+            except Exception as e:
+                warn(QueryFileWarning(file='masterfile', err=e))
+                query = False
+                
+        # Read local masterfile if query is False or query failed
         if not query:
-            return cls.read(custom_file)
+            # Try to read locally
+            try:
+                master = cls.read(param['masterfile'])
+            except Exception as e:
+                warn(GetLocalFileWarning(file='masterfile', err=e))
+                # Return custom_file as last ressort
+                return cls.read(param['custom_file'])
 
-        #############################################
-        # else, query and complement with custom_file
-        #############################################
-
-        # Try to query the complemented masterfile.
-        # If impossible, simply return the local `custom_file`
+        # Finally, complement with the local `custom_file`
         try:
-            master = cls.query(**kwargs)
-
-        except Exception as e:
-            warn(QueryFileWarning(file='masterfile', err=e))
-            return cls.read(custom_file)
-
-        # Complement the complemented masterfile (lol) with
-        # the local `custom_file`
-        try:
-            custom = cls.read(custom_file)
+            custom = cls.read(param['custom_file'])
             master.replace_with(custom)
         except Exception as e:
-            warn(GetCustomFileWarning(err=e))
+            warn(GetLocalFileWarning(file='custom file', err=e))
 
         return master
+    
+    @classmethod
+    def load_ref(cls, query=True, param=None, **kwargs):
+        '''
+        Returns the masterfile reference table complemented.
+        Parameters
+        - param: dict
+            dictionnairy of the local files names. Default is param file.
+            keys: 'masterfile' and 'custom_file'
+            `custom_file` will be use to replace values in the masterfile.
+            `masterfile` is the local masterfile.
+        - query: bool
+            query or not the masterfile. If False, simply read `custom_file`
+        - kwargs are passed to query() method 
+        '''
+        # Assign default values
+        if param is None: param = {}  #  Never put {} in the function definition
+        param = {**Param.load().value, **param}
+
+        ###########################
+        # Complement the masterfile
+        ###########################
+        # Query online if True
+        if query:
+            # Try to query the complemented masterfile.
+            # If impossible, set query to False
+            try:
+                master = cls.query(url_key='url_ref', sheet_name='Ref')
+            except Exception as e:
+                warn(QueryFileWarning(file='reference file', err=e))
+                query = False
+
+        # Read local masterfile if query is False or query failed
+        if not query:
+            # Try to read locally
+            try:
+                master = cls.read(param['ref_file'])
+            except Exception as e:
+                warn(GetLocalFileWarning(file='reference file', err=e))
+                # Return 'custom ref' everywhere as last resort
+                custom = cls.read(param['custom_file'])
+                return custom.mk_unique_ref_table('custom ref')
+
+        # Finally, complement with the local `custom_file`
+        try:
+            # Read the file
+            custom = cls.read(param['custom_file'])
+            # Convert in a reference table
+            custom = custom.mk_unique_ref_table('custom ref')
+            # Edit master ref table
+            master.replace_with(custom)
+        except Exception as e:
+            warn(GetLocalFileWarning(file='custom file', err=e))
+
+        return master
+
 
 
 class GoogleSheet(MasterFile):
