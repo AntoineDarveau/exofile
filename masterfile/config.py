@@ -47,7 +47,7 @@ class Param():
     @classmethod
     def load(cls, filename=None, raise_err=False, **kwargs):
         
-        kwargs = {'Loader':yaml.FullLoader, **kwargs}
+        kwargs = {'Loader':yaml.Loader, **kwargs}
         
         if filename is None:
             output = cls._load_default(raise_err, **kwargs)
