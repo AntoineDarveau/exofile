@@ -38,5 +38,6 @@ git clone git@github.com:AntoineDarveau/masterfile.git
 ```
 Then, there are many ways to refer to the code, but one could be to add the ` '/path/to/repository/masterfile/' ` to your `PYTHONPATH`. See this [link](https://stackoverflow.com/questions/3402168/permanently-add-a-directory-to-pythonpath) for more information on how to do that. This will ensure that you can import `masterfile` from anywhere in your computer. Another way is to add ` from sys import path; path.append('/path/to/repository/masterfile/')) ` at the beggining of each code and then you will be able to import `masterfile`
 
-
-You can also change the default parameters file. Take a look at the notebook for examples.
+Customize
+---------
+You can change the default parameters file. Take a look at the notebook for examples.
