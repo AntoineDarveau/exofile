@@ -48,7 +48,11 @@ class MasterFile(Table):
     
         # Initiate table with the same structure
         keys = self.keys()
-        out = Table(names=keys, dtype=['bytes' for k in keys], masked=True, data=self.mask)
+        out = Table(names=keys, dtype=['bytes' for k in keys],
+                    masked=True, data=self.mask.copy())
+        # Remove units from column definition
+        for key in out.keys():
+            out[key].unit = None
 
         # Get all references
         if ref_link:
@@ -80,8 +84,11 @@ class MasterFile(Table):
     
         # Initiate table with the same structure
         keys = self.keys()
-        out = Table(names=keys, dtype=['bytes' for k in keys], masked=True, data=self.mask)
-
+        out = Table(names=keys, dtype=['bytes' for k in keys],
+                    masked=True, data=self.mask.copy())
+        # Remove units from column definition
+        for key in out.keys():
+            out[key].unit = None
         
         refs = MaskedColumn([ref for lines in self], dtype='bytes')
 
@@ -219,26 +226,30 @@ class MasterFile(Table):
         # Take main_col if key is not given
         main_col = main_col or other.main_col
         
+        # Make sure `other` is masked
+        other = MasterFile(other, copy=True, masked=True)
+        
         # Save units for conversion
         units = {}
         for key in other.keys():
             units[key] = self[key].unit
+            # Check if they are the same
             if other[key].unit != self[key].unit:
-                warn(ColUnitsWarning(key, [units[key], other[key].unit]))
+                warn(ColUnitsWarning(key, [other[key].unit, units[key]]))
 
         # Get position in main table
         index = self.get_index(*other[main_col], name_key=main_col)
         index = array(index)
 
-        # Make new table for objects not in self (to be append later)
-        new = MasterFile(other[index == -1], copy=True)
+        # Add empty rows for objects not in `self`
+        for name in other[index == -1]['pl_name']:
+            self.add_row({'pl_name': name})
 
-        # Remove new objects
-        i_old = (index != -1)
-        other = MasterFile(other[i_old], copy=True, masked=True)
-        index = index[i_old]
+        # Get position in main table again
+        index = self.get_index(*other[main_col], name_key=main_col)
+        index = array(index)
 
-        # Replace values of objects present in `self`
+        # Replace values of objects in `self`
         for i_other, i_self in enumerate(index):
             # Position of keys that are not masked
             i_keys, = where(~array(list(other.mask[i_other])))
@@ -258,11 +269,6 @@ class MasterFile(Table):
                     conversion = other[key].unit.to(units[key])
                     self[i_self][key] = other[i_other][key] * conversion
     
-        # Finally, add the new objects to self
-        for i_row in range(len(new)):
-            self.add_row(
-                {key:new[key][i_row] for key in new.keys()}
-            )
 
     @classmethod
     def query(cls, url_key='url', debug=False, **kwargs):
@@ -380,7 +386,8 @@ class MasterFile(Table):
             # Try to query the complemented masterfile.
             # If impossible, set query to False
             try:
-                master = cls.query(url_key='url_ref', sheet_name='Ref')
+                master = cls.query(url_key='url_ref',
+                                   sheet_name='Ref', keep_units=False)
             except Exception as e:
                 warn(QueryFileWarning(file='reference file', err=e))
                 query = False
@@ -421,7 +428,7 @@ class GoogleSheet(MasterFile):
     url_root = 'https://docs.google.com/spreadsheets/d/{}/gviz/tq?tqx=out:csv&sheet={}'
     
     @classmethod
-    def query(cls, key, sheet_name=0, check_units='silent'):
+    def query(cls, key, sheet_name=0, check_units='silent', keep_units=True):
         
         url = cls.url_root.format(key, sheet_name)
         
@@ -439,8 +446,11 @@ class GoogleSheet(MasterFile):
     
             # Rename and assign units
             table.rename_column(key, name)
-            if unit != 'None':
+            if unit != 'None' and keep_units:
                 table[name].unit = Unit(unit, parse_strict=check_units)
+            else:
+                table[name].unit = None
+                
         
         return table
     

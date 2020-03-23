@@ -4,8 +4,8 @@ class ColUnitsWarning(UnitsWarning):
     
     def __init__(self, col, units):
         
-        message = "Units conflict for '{}' column. '{}' is required"  \
-                + " but '{}' is given in the table to merge."  \
+        message = "Units conflict for '{}' column."  \
+                + " Converting '{}' to '{}'."  \
                 + " Make sure units were properly converted."
         message = message.format(col, *units)
         
