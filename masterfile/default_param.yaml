@@ -9,7 +9,7 @@ url_ref:
   Value: http://www.astro.umontreal.ca/~adb/reference_file.ecsv
 custom_file:
   Description: string, Local file with custom values. Will be used to complement the online masterfile
-  Value: masterfile_custom.csv
+  Value: masterfile_custom.ecsv
 masterfile:
   Description: string, Local masterfile to use offline.
   Value: masterfile.ecsv

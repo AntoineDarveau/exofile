@@ -1,5 +1,6 @@
 # Librairy imports
 from astropy.table import vstack
+from astropy.units import Unit
 import requests
 import re
 from numpy import where, array
@@ -8,7 +9,9 @@ from warnings import warn
 # Local imports
 from .table_custom import Table, MaskedColumn
 from .config import Param
-from .exceptions import QueryFileWarning, GetLocalFileWarning
+from .exceptions import (QueryFileWarning,
+                         GetLocalFileWarning,
+                         ColUnitsWarning)
 
 
 def get_refname_from_link(link):
@@ -206,7 +209,7 @@ class MasterFile(Table):
 
         return new, ref_table
     
-    def replace_with(self, other, key=None):
+    def replace_with(self, other, main_col=None):
         '''
         Use all non-masked values of `other` to replace values in `self`.
         `key` is the column use to identify corresponding rows.
@@ -214,10 +217,17 @@ class MasterFile(Table):
         '''
 
         # Take main_col if key is not given
-        key = key or other.main_col
+        main_col = main_col or other.main_col
+        
+        # Save units for conversion
+        units = {}
+        for key in other.keys():
+            units[key] = self[key].unit
+            if other[key].unit != self[key].unit:
+                warn(ColUnitsWarning(key, [units[key], other[key].unit]))
 
         # Get position in main table
-        index = self.get_index(*other[key], name_key=key)
+        index = self.get_index(*other[main_col], name_key=main_col)
         index = array(index)
 
         # Make new table for objects not in self (to be append later)
@@ -225,10 +235,10 @@ class MasterFile(Table):
 
         # Remove new objects
         i_old = (index != -1)
-        other = MasterFile(other[i_old], copy=True)
+        other = MasterFile(other[i_old], copy=True, masked=True)
         index = index[i_old]
 
-        # Replace values
+        # Replace values of objects present in `self`
         for i_other, i_self in enumerate(index):
             # Position of keys that are not masked
             i_keys, = where(~array(list(other.mask[i_other])))
@@ -237,14 +247,22 @@ class MasterFile(Table):
             keys = [other.keys()[i_key] for i_key in i_keys]
 
             # Don't change values for main column
-            keys.remove(key)
+            keys.remove(main_col)
 
             # Assign new values
-            self[i_self][keys] = other[i_other][keys]
+            for key in keys:
+                # Don't convert units if unit is None. Else do so.
+                if units[key] is None:
+                    self[i_self][key] = other[i_other][key]
+                else:
+                    conversion = other[key].unit.to(units[key])
+                    self[i_self][key] = other[i_other][key] * conversion
     
         # Finally, add the new objects to self
         for i_row in range(len(new)):
-            self.add_row(new[i_row][self.keys()])
+            self.add_row(
+                {key:new[key][i_row] for key in new.keys()}
+            )
 
     @classmethod
     def query(cls, url_key='url', debug=False, **kwargs):
@@ -284,7 +302,7 @@ class MasterFile(Table):
         return master
     
     @classmethod
-    def load(cls, query=True, param=None, **kwargs):
+    def load(cls, query=True, param=None, debug=None, **kwargs):
         '''
         Returns the masterfile complemented.
         Parameters
@@ -311,6 +329,7 @@ class MasterFile(Table):
             try:
                 master = cls.query(**kwargs)
             except Exception as e:
+                if debug == 'raise': raise e
                 warn(QueryFileWarning(file='masterfile', err=e))
                 query = False
                 
@@ -320,6 +339,7 @@ class MasterFile(Table):
             try:
                 master = cls.read(param['masterfile'])
             except Exception as e:
+                if debug == 'raise': raise e
                 warn(GetLocalFileWarning(file='masterfile', err=e))
                 # Return custom_file as last ressort
                 return cls.read(param['custom_file'])
@@ -329,6 +349,7 @@ class MasterFile(Table):
             custom = cls.read(param['custom_file'])
             master.replace_with(custom)
         except Exception as e:
+            if debug=='raise': raise e
             warn(GetLocalFileWarning(file='custom file', err=e))
 
         return master
@@ -387,6 +408,11 @@ class MasterFile(Table):
             warn(GetLocalFileWarning(file='custom file', err=e))
 
         return master
+    
+    def write_to_custom(self, *args, **kwargs):
+
+        file = Param.load().value['custom_file']
+        self.write(file, *args, **kwargs)
 
 
 
@@ -395,7 +421,7 @@ class GoogleSheet(MasterFile):
     url_root = 'https://docs.google.com/spreadsheets/d/{}/gviz/tq?tqx=out:csv&sheet={}'
     
     @classmethod
-    def query(cls, key, sheet_name=0):
+    def query(cls, key, sheet_name=0, check_units='silent'):
         
         url = cls.url_root.format(key, sheet_name)
         
@@ -413,7 +439,8 @@ class GoogleSheet(MasterFile):
     
             # Rename and assign units
             table.rename_column(key, name)
-            table[name].unit = unit
+            if unit != 'None':
+                table[name].unit = Unit(unit, parse_strict=check_units)
         
         return table
     

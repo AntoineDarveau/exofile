@@ -122,8 +122,8 @@ class Table(table.Table):
         self.add_column(self[colname_temp], name=colname, index=0)
         self.remove_column(colname_temp)
     
-    def correct_units(self, badunits=['degrees', 'days', 'hours','jovMass'],
-                     gunits=['degree', 'day', 'hour','jupiterMass'], verbose=True,
+    def correct_units(self, badunits=['degrees', 'days', 'hours','jovMass', 'mags'],
+                     gunits=['degree', 'day', 'hour','jupiterMass', 'mag'], verbose=True,
                      debug=False):
         '''
         Correct columns units for astropy units

@@ -1,3 +1,17 @@
+from astropy.units import UnitsWarning
+
+class ColUnitsWarning(UnitsWarning):
+    
+    def __init__(self, col, units):
+        
+        message = "Units conflict for '{}' column. '{}' is required"  \
+                + " but '{}' is given in the table to merge."  \
+                + " Make sure units were properly converted."
+        message = message.format(col, *units)
+        
+        super().__init__(message)
+
+
 class BaseFileWarning(UserWarning):
     
     def __init__(self, message, file=None, err=None):

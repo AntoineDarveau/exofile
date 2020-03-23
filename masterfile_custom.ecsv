@@ -1,0 +1,10 @@
+# %ECSV 0.9
+# ---
+# datatype:
+# - {name: pl_name, datatype: string}
+# - {name: pl_eqt, unit: K, datatype: float64}
+# - {name: pl_trandur, unit: h, datatype: float64}
+# schema: astropy-2.0
+pl_name pl_eqt pl_trandur
+"HD 189733 b" 1271.0 3.0
+"NewSecretPlanet b" 1503.0 4.0
