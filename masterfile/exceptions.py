@@ -10,6 +10,17 @@ class ColUnitsWarning(UnitsWarning):
         message = message.format(col, *units)
         
         super().__init__(message)
+        
+class NoUnitsWarning(UnitsWarning):
+    
+    def __init__(self, col, units):
+        
+        message = "Units conflict for '{}' column."  \
+                + " No units were specified."  \
+                + " Assuming '{}'."
+        message = message.format(col, units)
+        
+        super().__init__(message)
 
 
 class BaseFileWarning(UserWarning):
