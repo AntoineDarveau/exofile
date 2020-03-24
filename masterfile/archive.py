@@ -11,7 +11,8 @@ from .table_custom import Table, MaskedColumn
 from .config import Param
 from .exceptions import (QueryFileWarning,
                          GetLocalFileWarning,
-                         ColUnitsWarning)
+                         ColUnitsWarning,
+                         NoUnitsWarning)
 
 
 def get_refname_from_link(link):
@@ -48,7 +49,7 @@ class MasterFile(Table):
     
         # Initiate table with the same structure
         keys = self.keys()
-        out = Table(names=keys, dtype=['bytes' for k in keys],
+        out = MasterFile(names=keys, dtype=['bytes' for k in keys],
                     masked=True, data=self.mask.copy())
         # Remove units from column definition
         for key in out.keys():
@@ -84,8 +85,9 @@ class MasterFile(Table):
     
         # Initiate table with the same structure
         keys = self.keys()
-        out = Table(names=keys, dtype=['bytes' for k in keys],
-                    masked=True, data=self.mask.copy())
+        mask = Table(self, copy=True, masked=True).mask
+        out = MasterFile(names=keys, dtype=['bytes' for k in keys],
+                    masked=True, data=mask)
         # Remove units from column definition
         for key in out.keys():
             out[key].unit = None
@@ -97,7 +99,7 @@ class MasterFile(Table):
             out[key] = refs
 
         out['pl_name'] = self['pl_name']  # Keep the planet name
-        out.mask = self.mask  #  Keep mask
+        out.mask = mask  #  Keep mask
 
         return out
     
@@ -234,8 +236,12 @@ class MasterFile(Table):
         for key in other.keys():
             units[key] = self[key].unit
             # Check if they are the same
-            if other[key].unit != self[key].unit:
-                warn(ColUnitsWarning(key, [other[key].unit, units[key]]))
+            if other[key].unit != units[key]:
+                if other[key].unit is None:
+                    other[key].unit = units[key]
+                    warn(NoUnitsWarning(key, units[key]))
+                else:
+                    warn(ColUnitsWarning(key, [other[key].unit, units[key]]))
 
         # Get position in main table
         index = self.get_index(*other[main_col], name_key=main_col)
@@ -361,7 +367,7 @@ class MasterFile(Table):
         return master
     
     @classmethod
-    def load_ref(cls, query=True, param=None, **kwargs):
+    def load_ref(cls, query=True, param=None, debug=None, **kwargs):
         '''
         Returns the masterfile reference table complemented.
         Parameters
@@ -389,6 +395,7 @@ class MasterFile(Table):
                 master = cls.query(url_key='url_ref',
                                    sheet_name='Ref', keep_units=False)
             except Exception as e:
+                if debug == 'raise': raise e
                 warn(QueryFileWarning(file='reference file', err=e))
                 query = False
 
@@ -398,6 +405,7 @@ class MasterFile(Table):
             try:
                 master = cls.read(param['ref_file'])
             except Exception as e:
+                if debug == 'raise': raise e
                 warn(GetLocalFileWarning(file='reference file', err=e))
                 # Return 'custom ref' everywhere as last resort
                 custom = cls.read(param['custom_file'])
@@ -412,6 +420,7 @@ class MasterFile(Table):
             # Edit master ref table
             master.replace_with(custom)
         except Exception as e:
+            if debug == 'raise': raise e
             warn(GetLocalFileWarning(file='custom file', err=e))
 
         return master
