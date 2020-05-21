@@ -32,9 +32,9 @@ data = MasterFile.load()
 
 Setup
 -----
-Simply clone `masterfile` by running the following line in a terminal (you need to be in the directory where you want to copy `masterfile`).
+Simply clone `masterfile`. One simple way to do it is to run the following line in a terminal (you need to be in the directory where you want to copy `masterfile`).
 ```unix
-git clone git@github.com:AntoineDarveau/masterfile.git
+git clone https://github.com/AntoineDarveau/masterfile.git
 ```
 Then, there are many ways to refer to the code, but one could be to add the ` '/path/to/repository/masterfile/' ` to your `PYTHONPATH`. See this [link](https://stackoverflow.com/questions/3402168/permanently-add-a-directory-to-pythonpath) for more information on how to do that. This will ensure that you can import `masterfile` from anywhere in your computer. Another way is to add ` from sys import path; path.append('/path/to/repository/masterfile/')) ` at the beggining of each code and then you will be able to import `masterfile`
 
