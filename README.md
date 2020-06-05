@@ -5,12 +5,11 @@ __IMPORTANT__: _masterfile_ is the name of a file and the name of this code (sor
 _masterfile.ecsv_ is based on the exoplanet archive tables.
 The masterfile and the reference table are available at http://www.astro.umontreal.ca/~adb/
 
-Contributors:
--------------
-- Antoine Darveau-Bernier
+Thanks to for advices and corrections:
+--------------
 - Merrin Peterson
 - Charles Cadieux
-- Taylor Bell?
+- Taylor Bell
 
 Concept
 -------
