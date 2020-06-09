@@ -314,7 +314,8 @@ class MasterFile(Table):
         return master
     
     @classmethod
-    def load(cls, query=True, param=None, debug=None, **kwargs):
+    def load(cls, query=True, param=None, debug=None,
+             query_kwargs=None, masterfile_kwargs=None, **kwargs):
         '''
         Returns the masterfile complemented.
         Parameters
@@ -325,10 +326,22 @@ class MasterFile(Table):
             `masterfile` is the local masterfile.
         - query: bool
             query or not the masterfile. If False, simply read `custom_file`
-        - kwargs are passed to query() method 
+        - query_kwargs: None or dictionnary
+            Passed to query() method
+        - masterfile_kwargs: None or dictionnary
+            Passed to table.read() when reading the local masterfile
+            (see astropy.table.read)
+        - kwargs
+            Passed to table.read() when reading the custom table
+            (see astropy.table.read)
         '''
-        # Assign default values
-        if param is None: param = {}  #  Never put {} in the function definition
+        # Assign default dictionnary values
+        #  Never put {} in the function definition
+        if param is None: param = {}
+        if query_kwargs is None: query_kwargs = {}
+        if masterfile_kwargs is None: masterfile_kwargs = {}
+            
+        # Use module parameters and complete with input parameters
         param = {**Param.load().value, **param}
 
         ###########################
@@ -339,7 +352,7 @@ class MasterFile(Table):
             # Try to query the complemented masterfile.
             # If impossible, set query to False
             try:
-                master = cls.query(**kwargs)
+                master = cls.query(**query_kwargs)
             except Exception as e:
                 if debug == 'raise': raise e
                 warn(QueryFileWarning(file='masterfile', err=e))
@@ -349,16 +362,16 @@ class MasterFile(Table):
         if not query:
             # Try to read locally
             try:
-                master = cls.read(param['masterfile'])
+                master = cls.read(param['masterfile'], **masterfile_kwargs)
             except Exception as e:
                 if debug == 'raise': raise e
                 warn(GetLocalFileWarning(file='masterfile', err=e))
                 # Return custom_file as last ressort
-                return cls.read(param['custom_file'])
+                return cls.read(param['custom_file'], **kwargs)
 
         # Finally, complement with the local `custom_file`
         try:
-            custom = cls.read(param['custom_file'])
+            custom = cls.read(param['custom_file'], **kwargs)
             master.replace_with(custom)
         except Exception as e:
             if debug=='raise': raise e

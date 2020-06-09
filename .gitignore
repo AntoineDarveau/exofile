@@ -2,6 +2,7 @@
 # Custom ignored files
 ######################
 
+schema.key
 Tests_masterfile.ipynb
 private.py
 masterfile/param.yaml
