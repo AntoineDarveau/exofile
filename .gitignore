@@ -2,11 +2,18 @@
 # Custom ignored files
 ######################
 
+schema.key
 Tests_masterfile.ipynb
 private.py
 masterfile/param.yaml
 old_masterfile_log.txt
 masterfile_custom.ecsv
+
+################
+# Mac OS related
+################
+
+.DS_Store
 
 ######################
 # Python related ignored files

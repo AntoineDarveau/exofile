@@ -4,8 +4,9 @@ from astropy.table.operations import _join, _merge_table_meta
 import numpy as np
 from collections import OrderedDict
 from astropy.units import Unit, UnitTypeError 
-import warnings
-from astropy.utils.exceptions import AstropyUserWarning
+# import warnings
+from warnings import warn
+# from astropy.utils.exceptions import AstropyUserWarning
 
 
 class MaskedColumn(table.MaskedColumn):
@@ -19,6 +20,26 @@ class MaskedColumn(table.MaskedColumn):
         else:
             return NotImplemented
 
+    def to_array(self, units=None):
+        """
+        Returns the columns as a MaskedArray.
+        If units are specified, convert to good units
+        before returning the array.
+        """
+        if units is None:
+            return self.data.copy()
+        else:
+            # Convert to quantity array
+            data = self.quantity
+            # Need to stored masked values
+            # (quantity arrays don't deal with masks)
+            mask = self.mask
+
+            # Make sure it has the good units
+            data = data.to(units)
+
+            # Convert to array and put Nans when masked
+            return np.ma.array(data.value, mask=mask)
 
 class Column(table.Column):
 
@@ -81,7 +102,7 @@ class Table(table.Table):
         """
         
         return self.by_pl_name(*args, **kwargs)
-    
+
     def get_index(self, *plName, name_key=None):
         '''
         Return the lines index where plName are located for the column given by name_key
@@ -149,6 +170,10 @@ class Table(table.Table):
         '''
         Returns columns given in input as astropy q_arrays
         '''
+
+        warn(DeprecationWarning(
+            "This method will be removed in future versions. Do not use it."))
+
         out = []
         for k in keys:
             try:
