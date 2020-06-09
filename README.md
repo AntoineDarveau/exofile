@@ -12,9 +12,16 @@ Thanks to for advices and corrections:
 - Taylor Bell
 - Anne Boucher
 
+_Also thanks to my supervisors,_ David Lafrenière _and_ René Doyon!
+
 Concept
 -------
 The idea is to make the most complete table as possible.
+Here is a scheme of the concept:
+
+![Concept_scheme](schema.png)
+
+Explanations:
 1. The [Confirmed Planet Table](https://exoplanetarchive.ipac.caltech.edu/docs/API_exoplanet_columns.html) is used to fill the masterfile. 
 2. Then, the [Extended Planet Table](https://exoplanetarchive.ipac.caltech.edu/docs/API_exomultpars_columns.html) is used to fill the missing values. The references are sorted according to the error on the orbital period (this could be changed). All the values from a particular reference are used to keep a minimum of consistency.
 
