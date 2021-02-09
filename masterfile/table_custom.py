@@ -38,7 +38,7 @@ class MaskedColumn(table.MaskedColumn):
             # Make sure it has the good units
             data = data.to(units)
 
-            # Convert to array and put Nans when masked
+            # Convert to masked array
             return np.ma.array(data.value, mask=mask)
 
 class Column(table.Column):
@@ -51,6 +51,24 @@ class Column(table.Column):
 
         else:
             return NotImplemented
+        
+    def to_array(self, units=None):
+        """
+        Returns the columns as an array.
+        If units are specified, convert to good units
+        before returning the array.
+        """
+        if units is None:
+            return self.data.copy()
+        else:
+            # Convert to quantity array
+            data = self.quantity
+
+            # Make sure it has the good units
+            data = data.to(units)
+
+            # Convert to array
+            return np.array(data.value)
 
 
 class Table(table.Table):

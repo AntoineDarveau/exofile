@@ -1,9 +1,11 @@
 # Librairy imports
 from astropy.table import vstack
 from astropy.units import Unit
+from astropy.time import Time
 import requests
 import re
-from numpy import where, array
+import numpy as np
+# from numpy import where, array
 from warnings import warn
 
 # Local imports
@@ -105,11 +107,15 @@ class MasterFile(Table):
     
     def get_colnames_with_error(self, err_ext=['err1','err2']):
         '''
-        Find all columns with an error column associated
-        err_ext is the list of extensions for the name of the error columns.
+        Find all columns with an error column associate`.
+        `err_ext` is the list of extensions for the name of the error columns.
+        Returns a tuple of lists, each lists contain the name of a column
+        and the names of its related errors.
+        
         Example: 
         colname = 'pl_tperi'
         errcols: 'pl_tperierr1' and 'pl_tperierr2'
+        The output would be: (['pl_tperi', 'pl_tperierr1', 'pl_tperierr2'], )
         '''
 
         colnames = ()
@@ -135,21 +141,50 @@ class MasterFile(Table):
 
             mask = self[cols].mask
             # Convert to regular array
-            mask = array(mask.as_array().tolist())
+            mask = np.array(mask.as_array().tolist())
 
             # Find where values, err1 or err2 are masked
-            imask = where(mask.any(axis=-1))
+            imask = np.where(mask.any(axis=-1))
 
             # Mask values, err1 and err2 at these rows
             for col in cols:
                 self[col].mask[imask] = True
-    
+                
+    def mask_zero_errors(self, **kwargs):
+        '''
+        Mask columns where associated errors are equal to zero
+        '''
+        for cols in self.get_colnames_with_error(**kwargs):
+
+            # Put all errors in a 2d array (ex: err1, err2)
+            errors = [self[col].data for col in cols[1:]]
+            errors = np.ma.array(errors).T       
+
+            # Find where err1 or err2 are zero
+            cond = (errors == 0.0)
+            imask = np.where(cond.any(axis=-1))[0]
+
+            # Mask value, err1 and err2 at these rows
+            for col in cols:
+                if imask.any():
+                    self[col].mask[imask] = True
+
     
     @staticmethod
-    def update(verbose=True):
+    def update(sort_keys=None, verbose=True):
         '''
         Returns an updated masterfile built with the NasaExoplanetArchive.
+
+        Parameters
+        ----------
+        sort_keys : str or list of str
+            The key(s) to order the table by (passed to `astropy.table.sort`).
+            If None, use the column 'today_tranmid_err'.
         '''
+        # Default sort keys
+        if sort_keys is None:
+            sort_keys = ['today_tranmid_err']
+        
         # Read new database from exoplanet archive 
         if verbose: print("Query Confirmed Planet Table...", end="")
         
@@ -168,11 +203,14 @@ class MasterFile(Table):
         extended.ch_col_names()
 
         # Remove used reference (already in Planet table)
-        index, = where(extended['mpl_def'])
+        index, = np.where(extended['mpl_def'])
         extended.remove_rows(index)
+        
+        # Add estimate of transit mid time error as of today
+        extended.estim_ephemeride_err()
 
         # Sort to choose the reference accordingly
-        extended.sort('pl_orbpererr1')
+        extended.sort(sort_keys)
 
         # Group by planet's name
         grouped = extended.group_by(['pl_name'])
@@ -245,7 +283,7 @@ class MasterFile(Table):
 
         # Get position in main table
         index = self.get_index(*other[main_col], name_key=main_col)
-        index = array(index)
+        index = np.array(index)
 
         # Add empty rows for objects not in `self`
         for name in other[index == -1]['pl_name']:
@@ -253,12 +291,12 @@ class MasterFile(Table):
 
         # Get position in main table again
         index = self.get_index(*other[main_col], name_key=main_col)
-        index = array(index)
+        index = np.array(index)
 
         # Replace values of objects in `self`
         for i_other, i_self in enumerate(index):
             # Position of keys that are not masked
-            i_keys, = where(~array(list(other.mask[i_other])))
+            i_keys, = np.where(~np.array(list(other.mask[i_other])))
 
             # Keys not masked
             keys = [other.keys()[i_key] for i_key in i_keys]
@@ -442,7 +480,29 @@ class MasterFile(Table):
 
         file = Param.load().value['custom_file']
         self.write(file, *args, **kwargs)
+        
+    def estim_ephemeride_err(self):
+        '''
+        Compute error on the mid transit time as of today.
+        Create and add the column `today_tranmid_err`.
+        '''
+        # Get transit mid time and period
+        tranmid = self['pl_tranmid'].to_array(units='d')
+        orbper = self['pl_orbper'].to_array(units='d')
 
+        # Compute number of period since transit mid time
+        n_period = (Time.now().jd - tranmid) / orbper
+
+        # Get corresponding errors
+        orbper_err = self['pl_orbpererr1'].to_array(units='d')
+        tranmid_err = self['pl_tranmiderr1'].to_array(units='d')
+
+        # Compute error as of today
+        error_today = tranmid_err + n_period * orbper_err
+
+        # Save as a column
+        col = MaskedColumn(error_today, unit='d', name='today_tranmid_err')
+        self.add_column(col)
 
 
 class GoogleSheet(MasterFile):
@@ -498,6 +558,10 @@ class BaseArchive(MasterFile):
         # Mask where errors are not available
         data.mask_no_errors()  # err1 and err2 cols
         data.mask_no_errors(err_ext=['err'])  # err cols
+        
+        # Mask where errors are set to zero
+        data.mask_zero_errors()  # err1 and err2 cols
+        data.mask_zero_errors(err_ext=['err'])  # err cols
         
         return data
     
