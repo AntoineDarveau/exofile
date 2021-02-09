@@ -183,7 +183,7 @@ class MasterFile(Table):
         '''
         # Default sort keys
         if sort_keys is None:
-            sort_keys = ['today_tranmid_err']
+            sort_keys = ['today_pl_tranmiderr1', 'today_pl_orbtpererr1']
         
         # Read new database from exoplanet archive 
         if verbose: print("Query Confirmed Planet Table...", end="")
@@ -208,6 +208,9 @@ class MasterFile(Table):
         
         # Add estimate of transit mid time error as of today
         extended.estim_ephemeride_err()
+        
+        # Add estimate of transit mid time error as of today
+        extended.estim_ephemeride_err(ephemeride='pl_orbtper')
 
         # Sort to choose the reference accordingly
         extended.sort(sort_keys)
@@ -481,27 +484,33 @@ class MasterFile(Table):
         file = Param.load().value['custom_file']
         self.write(file, *args, **kwargs)
         
-    def estim_ephemeride_err(self):
+    def estim_ephemeride_err(self, ephemeride='pl_tranmid',
+                             err_ext='err1', orbper_ext=None):
         '''
-        Compute error on the mid transit time as of today.
-        Create and add the column `today_tranmid_err`.
+        Compute error on the ephemeride time as of today.
+        Create and add the column 'today_{ephemeride}{err_ext}'.
+        Default will be: 'today_pl_tranmiderr1'
         '''
+        # Take same err_ext for 
+        if orbper_ext is None:
+            orbper_ext = err_ext
+
         # Get transit mid time and period
-        tranmid = self['pl_tranmid'].to_array(units='d')
+        tranmid = self[ephemeride].to_array(units='d')
         orbper = self['pl_orbper'].to_array(units='d')
 
         # Compute number of period since transit mid time
         n_period = (Time.now().jd - tranmid) / orbper
 
         # Get corresponding errors
-        orbper_err = self['pl_orbpererr1'].to_array(units='d')
-        tranmid_err = self['pl_tranmiderr1'].to_array(units='d')
+        orbper_err = self['pl_orbper' + orbper_ext].to_array(units='d')
+        tranmid_err = self[ephemeride + err_ext].to_array(units='d')
 
         # Compute error as of today
         error_today = tranmid_err + n_period * orbper_err
 
         # Save as a column
-        col = MaskedColumn(error_today, unit='d', name='today_tranmid_err')
+        col = MaskedColumn(error_today, unit='d', name=f'today_{ephemeride}{err_ext}')
         self.add_column(col)
 
 
