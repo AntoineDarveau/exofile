@@ -47,7 +47,7 @@ python -m pip install -U pip
 python -m pip install -U .
 ```
 
-You can also install directly from github using `python3 -m pip install -U git+https://github.com/AntoineDarveau/masterfile.git#egg=masterfile`.
+You can also install directly from github using `python3 -m pip install -U "git+https://github.com/AntoineDarveau/masterfile.git#egg=masterfile"`.
 
 To install `masterfile` for development, it is recommended to use an isolated environment with a tool like conda, virtualenv or venv. Inside your environment, you can install following the steps above, but replacing `python -m pip install -U .` by `python -m pip install -U -e ".[dev]"`. This will install `masterfile` in editable mode (`-e`) and it will install the development dependencies.
 
