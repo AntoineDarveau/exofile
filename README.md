@@ -22,7 +22,7 @@ Here is a scheme of the concept:
 ![Concept_scheme](schema.png)
 
 Explanations:
-1. The [Confirmed Planet Table](https://exoplanetarchive.ipac.caltech.edu/docs/API_exoplanet_columns.html) is used to fill the masterfile. 
+1. The [Confirmed Planet Table](https://exoplanetarchive.ipac.caltech.edu/docs/API_exoplanet_columns.html) is used to fill the masterfile.
 2. Then, the [Extended Planet Table](https://exoplanetarchive.ipac.caltech.edu/docs/API_exomultpars_columns.html) is used to fill the missing values. The references are sorted according to the error on the orbital period (this could be changed). All the values from a particular reference are used to keep a minimum of consistency.
 
 The resulting file is called _masterfile.ecsv_ and can be used directly. It is also possible to complement this _masterfile.ecsv_ with:
@@ -35,15 +35,23 @@ To do so, simply use the following code:
 from masterfile.archive import MasterFile
 data = MasterFile.load()
 ```
-`data`is an instance of MasterFile which is inheriting from [astropy.table.Table](https://docs.astropy.org/en/stable/table/access_table.html) class (so it has the same behaviour).
+`data` is an instance of MasterFile which is inheriting from [astropy.table.Table](https://docs.astropy.org/en/stable/table/access_table.html) class (so it has the same behaviour).
 
-Setup
+Installation
 -----
-Simply clone `masterfile`. One simple way to do it is to run the following line in a terminal (you need to be in the directory where you want to copy `masterfile`).
+To install `masterfile`, simply clone the Github repository and install the project locally with pip. One simple way to do it is to run the following line in a terminal (you need to be in the directory where you want to copy `masterfile`).
 ```unix
 git clone https://github.com/AntoineDarveau/masterfile.git
+cd masterfile
+python -m pip install -U pip
+python -m pip install -U .
 ```
-Then, there are many ways to refer to the code, but one could be to add the ` '/path/to/repository/masterfile/' ` to your `PYTHONPATH`. See this [link](https://stackoverflow.com/questions/3402168/permanently-add-a-directory-to-pythonpath) for more information on how to do that. This will ensure that you can import `masterfile` from anywhere in your computer. Another way is to add ` from sys import path; path.append('/path/to/repository/masterfile/')) ` at the beggining of each code and then you will be able to import `masterfile`
+
+You can also install directly from github using `python3 -m pip install -U git+https://github.com/AntoineDarveau/masterfile.git#egg=masterfile`.
+
+To install `masterfile` for development, it is recommended to use an isolated environment with a tool like conda, virtualenv or venv. Inside your environment, you can install following the steps above, but replacing `python -m pip install -U .` by `python -m pip install -U -e ".[dev]"`. This will install `masterfile` in editable mode (`-e`) and it will install the development dependencies.
+
+You can then use `masterfile` with `import masterfile`. See the notebook for examples.
 
 Customize
 ---------
