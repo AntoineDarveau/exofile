@@ -1,1 +1,2 @@
 include masterfile/*.yml
+include masterfile/*.yaml
