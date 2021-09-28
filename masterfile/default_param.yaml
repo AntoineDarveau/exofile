@@ -3,10 +3,10 @@ sheet_key:
   Value: 14Trm-AQ2eOphfwqJYrevnDrNVk56E-aH8yvRHQLjzWg
 url:
   Description: string, Where to find the masterfile (url)
-  Value: http://www.astro.umontreal.ca/~adb/masterfile.ecsv
+  Value: https://www.astro.umontreal.ca/~adb/masterfile.ecsv
 url_ref:
   Description: string, Where to find the masterfiles references (url)
-  Value: http://www.astro.umontreal.ca/~adb/reference_file.ecsv
+  Value: https://www.astro.umontreal.ca/~adb/reference_file.ecsv
 custom_file:
   Description: string, Local file with custom values. Will be used to complement the online masterfile
   Value: masterfile_custom.ecsv
