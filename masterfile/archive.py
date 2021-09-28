@@ -416,7 +416,6 @@ class MasterFile(Table):
         ###########################
         # Query online if True
         if query:
-            breakpoint()
             # Try to query the complemented masterfile.
             # If impossible, set query to False
             try:
