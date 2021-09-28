@@ -22,7 +22,7 @@ def get_refname_from_link(link):
     Get the text from a reflink
     '''
     out = re.search(">(.*)</a>",link).group(1)
-    
+
     return out.strip()
 
 def get_refname_from_links(links):
@@ -32,15 +32,15 @@ def get_refname_from_links(links):
     return [get_refname_from_link(link) for link in links]
 
 class MasterFile(Table):
-    
+
     main_col = 'pl_name'
-    
-    
+
+
     def mk_ref_table(self, ref_link=True, ref_col='mpl_reflink'):
         '''
-        Return a table with the same structure as self, but with the 
+        Return a table with the same structure as self, but with the
         name of the reference at each position.
-        
+
         Parameters:
         - ref_link: bool
             Extract the reference name from a url link using
@@ -48,7 +48,7 @@ class MasterFile(Table):
         - ref_col: string
             Which column to use as the reference
         '''
-    
+
         # Initiate table with the same structure
         keys = self.keys()
         out = MasterFile(names=keys, dtype=['bytes' for k in keys],
@@ -71,12 +71,12 @@ class MasterFile(Table):
         out.mask = self.mask  #  Keep mask
 
         return out
-    
+
     def mk_unique_ref_table(self, ref='No Ref'):
         '''
-        Return a table with the same structure as self, but with the 
+        Return a table with the same structure as self, but with the
         name of the reference at each position.
-        
+
         Parameters:
         - ref_link: bool
             Extract the reference name from a url link using
@@ -84,7 +84,7 @@ class MasterFile(Table):
         - ref_col: string
             Which column to use as the reference
         '''
-    
+
         # Initiate table with the same structure
         keys = self.keys()
         mask = Table(self, copy=True, masked=True).mask
@@ -93,7 +93,7 @@ class MasterFile(Table):
         # Remove units from column definition
         for key in out.keys():
             out[key].unit = None
-        
+
         refs = MaskedColumn([ref for lines in self], dtype='bytes')
 
         # Put the ref in each columns
@@ -104,15 +104,15 @@ class MasterFile(Table):
         out.mask = mask  #  Keep mask
 
         return out
-    
+
     def get_colnames_with_error(self, err_ext=['err1','err2']):
         '''
         Find all columns with an error column associate`.
         `err_ext` is the list of extensions for the name of the error columns.
         Returns a tuple of lists, each lists contain the name of a column
         and the names of its related errors.
-        
-        Example: 
+
+        Example:
         colname = 'pl_tperi'
         errcols: 'pl_tperierr1' and 'pl_tperierr2'
         The output would be: (['pl_tperi', 'pl_tperierr1', 'pl_tperierr2'], )
@@ -132,7 +132,7 @@ class MasterFile(Table):
                 pass
 
         return colnames
-    
+
     def mask_no_errors(self, **kwargs):
         '''
         Mask columns where errors are not available
@@ -149,7 +149,7 @@ class MasterFile(Table):
             # Mask values, err1 and err2 at these rows
             for col in cols:
                 self[col].mask[imask] = True
-                
+
     def mask_zero_errors(self, **kwargs):
         '''
         Mask columns where associated errors are equal to zero
@@ -158,7 +158,7 @@ class MasterFile(Table):
 
             # Put all errors in a 2d array (ex: err1, err2)
             errors = [self[col].data for col in cols[1:]]
-            errors = np.ma.array(errors).T       
+            errors = np.ma.array(errors).T
 
             # Find where err1 or err2 are zero
             cond = (errors == 0.0)
@@ -169,7 +169,7 @@ class MasterFile(Table):
                 if imask.any():
                     self[col].mask[imask] = True
 
-    
+
     @staticmethod
     def update(sort_keys=None, verbose=True):
         '''
@@ -184,12 +184,12 @@ class MasterFile(Table):
         # Default sort keys
         if sort_keys is None:
             sort_keys = ['today_pl_tranmiderr1', 'today_pl_orbtpererr1']
-        
-        # Read new database from exoplanet archive 
+
+        # Read new database from exoplanet archive
         if verbose: print("Query Confirmed Planet Table...", end="")
-        
+
         new = PlanetArchive.query()
-        
+
         if verbose: print("Done")
 
         # Read new extended database from exoplanet archive to complete it
@@ -205,10 +205,10 @@ class MasterFile(Table):
         # Remove used reference (already in Planet table)
         index, = np.where(extended['mpl_def'])
         extended.remove_rows(index)
-        
+
         # Add estimate of transit mid time error as of today
         extended.estim_ephemeride_err()
-        
+
         # Add estimate of transit mid time error as of today
         extended.estim_ephemeride_err(ephemeride='pl_orbtper')
 
@@ -220,10 +220,10 @@ class MasterFile(Table):
 
         # Define a separate reference table
         if verbose: print("Building new reference table...", end='')
-        
+
         keys = extended.keys()
         ref_table = new.mk_ref_table(ref_link=False, ref_col='pl_def_refname')
-        
+
         if verbose: print("Done")
 
         # Convert to the same class
@@ -232,7 +232,7 @@ class MasterFile(Table):
 
 
         # Complete new table with extended table
-        if verbose: 
+        if verbose:
             print(
             "Completing database with extended database (may take some time)...",
             end='')
@@ -244,12 +244,12 @@ class MasterFile(Table):
             index = grouped.groups.indices[:-1]
 
             # Add to master table
-            new = new.complete(grouped[index], 'pl_name', 
+            new = new.complete(grouped[index], 'pl_name',
                                        add_col=False, verbose=False)
 
             # Add ref to ref_table
             ref = grouped[index].mk_ref_table()
-            ref_table = ref_table.complete(ref, 'pl_name', 
+            ref_table = ref_table.complete(ref, 'pl_name',
                                            add_col=False, verbose=False)
 
             # Remove from the main table
@@ -258,7 +258,7 @@ class MasterFile(Table):
         if verbose: print('Done')
 
         return new, ref_table
-    
+
     def replace_with(self, other, main_col=None):
         '''
         Use all non-masked values of `other` to replace values in `self`.
@@ -268,10 +268,10 @@ class MasterFile(Table):
 
         # Take main_col if key is not given
         main_col = main_col or other.main_col
-        
+
         # Make sure `other` is masked
         other = MasterFile(other, copy=True, masked=True)
-        
+
         # Save units for conversion
         units = {}
         for key in other.keys():
@@ -315,7 +315,7 @@ class MasterFile(Table):
                 else:
                     conversion = other[key].unit.to(units[key])
                     self[i_self][key] = other[i_other][key] * conversion
-    
+
 
     @classmethod
     def query(cls, url_key='url', debug=False, **kwargs):
@@ -353,7 +353,7 @@ class MasterFile(Table):
             warn(QueryFileWarning(file='google sheet', err=e))
 
         return master
-    
+
     @classmethod
     def load(cls, query=True, param=None, debug=None,
              query_kwargs=None, masterfile_kwargs=None, **kwargs):
@@ -381,7 +381,7 @@ class MasterFile(Table):
         if param is None: param = {}
         if query_kwargs is None: query_kwargs = {}
         if masterfile_kwargs is None: masterfile_kwargs = {}
-            
+
         # Use module parameters and complete with input parameters
         param = {**Param.load().value, **param}
 
@@ -390,6 +390,7 @@ class MasterFile(Table):
         ###########################
         # Query online if True
         if query:
+            breakpoint()
             # Try to query the complemented masterfile.
             # If impossible, set query to False
             try:
@@ -398,7 +399,7 @@ class MasterFile(Table):
                 if debug == 'raise': raise e
                 warn(QueryFileWarning(file='masterfile', err=e))
                 query = False
-                
+
         # Read local masterfile if query is False or query failed
         if not query:
             # Try to read locally
@@ -419,7 +420,7 @@ class MasterFile(Table):
             warn(GetLocalFileWarning(file='custom file', err=e))
 
         return master
-    
+
     @classmethod
     def load_ref(cls, query=True, param=None, debug=None, **kwargs):
         '''
@@ -432,7 +433,7 @@ class MasterFile(Table):
             `masterfile` is the local masterfile.
         - query: bool
             query or not the masterfile. If False, simply read `custom_file`
-        - kwargs are passed to query() method 
+        - kwargs are passed to query() method
         '''
         # Assign default values
         if param is None: param = {}  #  Never put {} in the function definition
@@ -478,12 +479,12 @@ class MasterFile(Table):
             warn(GetLocalFileWarning(file='custom file', err=e))
 
         return master
-    
+
     def write_to_custom(self, *args, **kwargs):
 
         file = Param.load().value['custom_file']
         self.write(file, *args, **kwargs)
-        
+
     def estim_ephemeride_err(self, ephemeride='pl_tranmid',
                              err_ext='err1', orbper_ext=None):
         '''
@@ -491,7 +492,7 @@ class MasterFile(Table):
         Create and add the column 'today_{ephemeride}{err_ext}'.
         Default will be: 'today_pl_tranmiderr1'
         '''
-        # Take same err_ext for 
+        # Take same err_ext for
         if orbper_ext is None:
             orbper_ext = err_ext
 
@@ -515,41 +516,41 @@ class MasterFile(Table):
 
 
 class GoogleSheet(MasterFile):
-    
+
     url_root = 'https://docs.google.com/spreadsheets/d/{}/gviz/tq?tqx=out:csv&sheet={}'
-    
+
     @classmethod
     def query(cls, key, sheet_name=0, check_units='silent', keep_units=True):
-        
+
         url = cls.url_root.format(key, sheet_name)
-        
+
         data = requests.get(url)
-        
+
         # Convert to astropy table
         table = cls.read(data.text, format='ascii')
-        
+
         # Remove units from the column name
         # The structure is: "name [units]"
         for key in table.keys():
             # Split name and units
             name, unit = key.split(' [')
             unit = unit.split(']')[0]
-    
+
             # Rename and assign units
             table.rename_column(key, name)
             if unit != 'None' and keep_units:
                 table[name].unit = Unit(unit, parse_strict=check_units)
             else:
                 table[name].unit = None
-                
-        
+
+
         return table
-    
+
 
 class BaseArchive(MasterFile):
-    
+
     url_root = 'http://exoplanetarchive.ipac.caltech.edu/cgi-bin/nstedAPI/nph-nstedAPI?'
-    
+
     @classmethod
     def _query(cls, url_tail):
         '''
@@ -557,28 +558,28 @@ class BaseArchive(MasterFile):
         '''
         # Query
         data = requests.get(cls.url_root + url_tail)
-        
+
         # Convert to an astropy Table
         data = cls.read(data.text, format='ascii')
-        
+
         # Correct
         data.correct_units(verbose=False)
-        
+
         # Mask where errors are not available
         data.mask_no_errors()  # err1 and err2 cols
         data.mask_no_errors(err_ext=['err'])  # err cols
-        
+
         # Mask where errors are set to zero
         data.mask_zero_errors()  # err1 and err2 cols
         data.mask_zero_errors(err_ext=['err'])  # err cols
-        
+
         return data
-    
+
 
 class PlanetArchive(BaseArchive):
-    
+
     main_col = 'pl_name'
-    
+
     @classmethod
     def query(cls, url_tail="table=exoplanets&select=*&format=ascii"):
         '''
@@ -588,19 +589,19 @@ class PlanetArchive(BaseArchive):
 
 
 class ExtendedArchive(BaseArchive):
-    
+
     @classmethod
     def query(cls, url_tail="table=exomultpars&select=*&format=ascii"):
         '''
         Get the extended planet table from exoplanet archive
         '''
         return cls._query(url_tail)
-    
+
     def ch_col_names(self):
         '''
         Give the same name as the Confirmed Planet table.
         '''
-        
+
         self.rename_columns(
            ["mpl_hostname",
             "mpl_letter",
