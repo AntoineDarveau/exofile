@@ -1,6 +1,4 @@
-# Librairy imports
 import re
-# from numpy import where, array
 from warnings import warn
 
 import numpy as np
@@ -11,7 +9,6 @@ from astropy.units import Unit
 from .config import Param
 from .exceptions import (ColUnitsWarning, GetLocalFileWarning, NoUnitsWarning,
                          QueryFileWarning)
-# Local imports
 from .table_custom import MaskedColumn, Table
 
 

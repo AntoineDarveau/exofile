@@ -1,12 +1,11 @@
+from collections import OrderedDict
+from warnings import warn
+
 from astropy.table import join
 import astropy.table as table
 from astropy.table.operations import _join, _merge_table_meta
+from astropy.units import Unit
 import numpy as np
-from collections import OrderedDict
-from astropy.units import Unit, UnitTypeError 
-# import warnings
-from warnings import warn
-# from astropy.utils.exceptions import AstropyUserWarning
 
 
 class MaskedColumn(table.MaskedColumn):
@@ -41,6 +40,7 @@ class MaskedColumn(table.MaskedColumn):
             # Convert to masked array
             return np.ma.array(data.value, mask=mask)
 
+
 class Column(table.Column):
 
     def find(self, sub, start=0, end=None):
@@ -51,7 +51,7 @@ class Column(table.Column):
 
         else:
             return NotImplemented
-        
+
     def to_array(self, units=None):
         """
         Returns the columns as an array.
@@ -113,12 +113,12 @@ class Table(table.Table):
             self.remove_row(int(position[0]))
 
         return out
-    
+
     def by_plName(self, *args, **kwargs):
         """
         Old name of by_pl_name. Just an alias
         """
-        
+
         return self.by_pl_name(*args, **kwargs)
 
     def get_index(self, *plName, name_key=None):
@@ -132,7 +132,7 @@ class Table(table.Table):
         for pl in plName:
             try:
                 position.append(int(self[name_key].find(pl)[0]))
-                
+
             except TypeError:
                 values = ', '.join(self[name_key].find(pl)[1])
                 if values:
@@ -146,7 +146,7 @@ class Table(table.Table):
                     )
         
         return position
-    
+
     def set_main_col(self, colname=None, extension='_temp'):
         '''
         Set self.main_col and assign it to the first column.
@@ -157,12 +157,12 @@ class Table(table.Table):
             self.main_col = colname
         elif colname is None:
             colname = self.main_col
-        
+
         colname_temp = colname+extension
         self.rename_column(colname, colname_temp)
         self.add_column(self[colname_temp], name=colname, index=0)
         self.remove_column(colname_temp)
-    
+
     def correct_units(self, badunits=['degrees', 'days', 'hours','jovMass', 'mags'],
                      gunits=['degree', 'day', 'hour','jupiterMass', 'mag'], verbose=True,
                      debug=False):
@@ -179,7 +179,7 @@ class Table(table.Table):
             for bunit, gunit in zip(badunits, gunits):
                 if self[col].unit == bunit:
                     self[col].unit = gunit
-                    
+
                     # Message and log it
                     self.log.append(
                         text_frame.format(col, self[col].unit, bunit))
@@ -335,9 +335,9 @@ class Table(table.Table):
         # Define column and add it
         col = MaskedColumn(*args, data=fct(*f_args, **f_kwargs), **kwargs)
         self.add_column(col)
-        
+
     def check_col_units(self, colname):
-        
+
         col_units = self[colname].unit
         try:  # Check if col_units valid
             1. * Unit(col_units)
@@ -366,13 +366,11 @@ def intersection(self, other):
         return list(set(self).intersection(other))
     else:
         return NotImplemented
-    
+
+
 def print_unit_error(str_unit):
-    
+
     try:
         Unit(str_unit)
     except ValueError as e:
         print(e)
-
-                    
-                 
