@@ -605,7 +605,7 @@ def format_ps_table(
     label_df = label_df.dropna(subset=[PS_NAME, PC_NAME])
     label_df = label_df[~label_df[PS_NAME].str.contains("systemref")]
     label_ps = label_df[PS_NAME].str.strip()
-    label_pc = label_df[PS_NAME].str.strip()
+    label_pc = label_df[PC_NAME].str.strip()
 
     for lps, lpc in zip(label_ps, label_pc):
         # Some columns are missing even if in CSV
@@ -613,7 +613,7 @@ def format_ps_table(
             try:
                 ps_tbl.rename_column(lps, lpc)
             except KeyError:
-                warn(f"Column {lps} was not found in new table", RuntimeWarning)
+                warn(f"Column {lps} was not found in PS table", RuntimeWarning)
     # Ref time keys are mismatched in CSV so one will be missing, need to update
     tper_ref = "pl_orbtper_systemref"
     tranmid_ref = "pl_tranmid_systemref"
