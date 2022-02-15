@@ -1,6 +1,6 @@
-from masterfile.archive import GoogleSheet
-from masterfile.config import Param
-from masterfile.utils import migrate_table
+from exofile.archive import GoogleSheet
+from exofile.config import Param
+from exofile.utils import migrate_table
 
 param = Param.load().value
 
