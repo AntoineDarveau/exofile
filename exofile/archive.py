@@ -410,6 +410,74 @@ class ExoFile(Table):
         col = MaskedColumn(error_today, unit="d", name=f"today_{ephemeride}{err_ext}")
         self.add_column(col)
 
+    @staticmethod
+    def update(
+            sort_keys: Optional[Union[str, List[str]]] = None,
+            verbose: bool = True,
+            use_composite_archive: bool = True,
+            local_table: Optional[Union[str, Path]] = None,
+        ):
+        """
+        Returns an updated masterfile built with the NasaExoplanetArchive.
+
+        Parameters
+        ----------
+        sort_keys : str or list of str
+            The key(s) to order the table by (passed to `astropy.table.sort`).
+            If None, use the column 'today_tranmid_err'.
+        """
+        # Default sort keys
+        if sort_keys is None:
+            sort_keys = ["today_pl_tranmiderr1", "today_pl_orbtpererr1"]
+
+        # Read new database from exoplanet archive
+        if use_composite_archive:
+            tbl_id = "pscomppars"
+            tbl_name = PC_NAME
+        else:
+            tbl_id = "ps"
+            tbl_name = PS_NAME
+
+        if verbose:
+            print(f"Querying {tbl_name}...", end="")
+
+        # TODO: Make sure OK with composite tbl kwd if keep this
+        if local_table is not None:
+            new = ExoArchive.read(local_table)
+            new = ExoArchive.format_table(new)
+        else:
+            new = ExoArchive.query(table=tbl_id)
+
+        if not use_composite_archive:
+            new = format_ps_table(new, verbose=verbose)
+            new = compose_from_ps(new, sort_keys, verbose=verbose)
+
+            # Get actual pc columns to compare with what's left.
+            # Using CSV from Archive deletes too many columns
+            pc_cols = ExoArchive.query(select="top 1 *").colnames
+
+            # Now remove extra columns
+            dlist = difference(new.colnames, pc_cols)
+            del new[dlist]
+
+            # Index with same order as pc_cols
+            new = new[pc_cols]
+
+            # Safety check
+            if len(difference(new.colnames, pc_cols)) > 0 or len(difference(pc_cols, new.colnames)):
+                raise RuntimeError(
+                    f"The formatted {tbl_id} table is incompatible with the masterfile/composite table format"
+                )
+
+        if verbose:
+            print("Done")
+
+        ref_cols = [cn for cn in new.colnames if cn.endswith("reflink")]
+        for cname in ref_cols:
+            new[cname] = get_refname_from_links(new[cname])
+
+        return new
+
 
 class GoogleSheet(ExoFile):
 
@@ -634,13 +702,11 @@ def compose_from_ps(
         index = grouped.groups.indices[:-1]
 
         # Add to master table
-        # TODO: The joint will need to account for the fact that have previously set
-        # all references to same source even when merge. Best strategy
-        # is probably to clear ref for missing parameters (i.e. add a nan/wtv value check)
-        # TODO: Unit test complete with a simple pl_name+value+reflink example
         # NOTE: This assumes that reflink will be masked if the value is masked.
         # Usually true, but would not hurt to check it somewhere
-        ps_tbl = ps_tbl.complete(grouped[index], "pl_name", add_col=False, verbose=False)
+        ps_tbl = ps_tbl.complete(
+            grouped[index], "pl_name", add_col=False, verbose=False
+        )
 
         # Remove from the main table
         grouped.remove_rows(index)
@@ -649,71 +715,3 @@ def compose_from_ps(
         print("Done")
 
     return ps_tbl
-
-
-def update_mf(
-        sort_keys: Optional[Union[str, List[str]]] = None,
-        verbose: bool = True,
-        use_composite_archive: bool = True,
-        local_table: Optional[Union[str, Path]] = None,
-    ) -> ExoFile:
-    """
-    Returns an updated masterfile built with the NasaExoplanetArchive.
-
-    Parameters
-    ----------
-    sort_keys : str or list of str
-        The key(s) to order the table by (passed to `astropy.table.sort`).
-        If None, use the column 'today_tranmid_err'.
-    """
-    # Default sort keys
-    if sort_keys is None:
-        sort_keys = ["today_pl_tranmiderr1", "today_pl_orbtpererr1"]
-
-    # Read new database from exoplanet archive
-    if use_composite_archive:
-        tbl_id = "pscomppars"
-        tbl_name = PC_NAME
-    else:
-        tbl_id = "ps"
-        tbl_name = PS_NAME
-
-    if verbose:
-        print(f"Querying {tbl_name}...", end="")
-
-    # TODO: Make sure OK with composite tbl kwd if keep this
-    if local_table is not None:
-        new = ExoArchive.read(local_table)
-        new = ExoArchive.format_table(new)
-    else:
-        new = ExoArchive.query(table=tbl_id)
-
-    if not use_composite_archive:
-        new = format_ps_table(new, verbose=verbose)
-        new = compose_from_ps(new, sort_keys, verbose=verbose)
-
-        # Get actual pc columns to compare with what's left.
-        # Using CSV from Archive deletes too many columns
-        pc_cols = ExoArchive.query(select="top 1 *").colnames
-
-        # Now remove extra columns
-        dlist = difference(new.colnames, pc_cols)
-        del new[dlist]
-
-        # Index with same order as pc_cols
-        new = new[pc_cols]
-
-        # Safety check
-        if len(difference(new.colnames, pc_cols)) > 0 or len(difference(pc_cols, new.colnames)):
-            raise RuntimeError(
-                f"The formatted {tbl_id} table is incompatible with the masterfile/composite table format"
-            )
-
-    if verbose:
-        print("Done")
-
-    ref_cols = [cn for cn in new.colnames if cn.endswith("reflink")]
-    for cname in ref_cols:
-        new[cname] = get_refname_from_links(new[cname])
-
-    return new
