@@ -4,7 +4,7 @@ Tools to generate and access the _exofile_, a customized exoplanet archive.
 
 **IMPORTANT**: _exofile_ is the name of a file and the name of this code (sorry for that). To distinguish between the two in the following text, _exofile.ecsv_ will be used for the file and `exofile` will be used for the code.
 
-_exofile.ecsv_ is based on the [NASA exoplanet archive](https://exoplanetarchive.ipac.caltech.edu/) tables, but allows users to include custom parameters in the final table. The _exofile.ecsv_ available at http://www.astro.umontreal.ca/~adb/ is based entirely on the NASA Exoplanet Archive tables.
+_exofile.ecsv_ is based on the [NASA exoplanet archive](https://exoplanetarchive.ipac.caltech.edu/) tables, but allows users to include custom parameters in the final table. The _masterfile.ecsv_ available at http://www.astro.umontreal.ca/~adb/ is based entirely on the NASA Exoplanet Archive tables (the name will be changed to _exofile.ecsv_ for this file as well in a future release).
 
 Thanks to for advices and corrections:
 --------------
