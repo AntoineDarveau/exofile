@@ -1,9 +1,11 @@
+from pathlib import Path
 from exofile.archive import ExoFile
 
-PATH_TO_FILE = "/home/vandal/composite.ecsv"
-PATH_TO_FILE_CUSTOM = "/home/vandal/custom_composite.ecsv"
+PATH_TO_EXODIR = Path("/home/adb/www/")
+PATH_TO_FILE = PATH_TO_EXODIR / "exofile.csv"
+PATH_TO_FILE_ALT = PATH_TO_EXODIR / "exofile_alt.csv"
 
 new = ExoFile.update()
 new.write(PATH_TO_FILE, overwrite=True)
-new_composite = ExoFile.update(use_composite_archive=False)
-new_composite.write(PATH_TO_FILE_CUSTOM, overwrite=True)
+new_alt = ExoFile.update(use_composite_archive=False)
+new_alt.write(PATH_TO_FILE_ALT, overwrite=True)
