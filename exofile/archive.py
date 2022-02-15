@@ -577,8 +577,11 @@ class ExoArchive(ExoFile):
         return data
 
 
-def load_exoplanet_archive_mappings(csv_path: Union[str, Path]) -> DataFrame:
+def load_exoplanet_archive_mappings(
+        csv_path: Optional[Union[str, Path]] = None
+    ) -> DataFrame:
 
+    csv_path = csv_path or ARCHIVE_CSV_PATH
     label_df = read_csv(
         csv_path,
         skiprows=[0, 2, 3],
@@ -595,7 +598,7 @@ def format_ps_table(
     ):
     # Map columns between PS and PS composite tables
     try:
-        label_df = load_exoplanet_archive_mappings(ARCHIVE_CSV_PATH)
+        label_df = load_exoplanet_archive_mappings()
     except:
         param = {**Param.load().value, **{}}
         local_path = param["archive_mappings_csv"]
