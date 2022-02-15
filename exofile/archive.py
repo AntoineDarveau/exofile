@@ -8,7 +8,7 @@ import requests
 from astropy.time import Time
 from astropy.units import Unit
 from astroquery.ipac.nexsci.nasa_exoplanet_archive import NasaExoplanetArchive
-from pandas import read_csv
+from pandas import read_csv, DataFrame
 
 from .config import Param
 from .exceptions import (ColUnitsWarning, GetLocalFileWarning, NoUnitsWarning,
@@ -33,7 +33,7 @@ MISSING_COLS = [
 ]
 PS_NAME = "Planetary Systems (PS)"
 PC_NAME = "Planetary Systems Composite Parameters (PSCP)"
-
+ARCHIVE_CSV_PATH = "https://exoplanetarchive.ipac.caltech.edu/docs/Exoplanet_Archive_Column_Mapping_CSV.csv"
 
 def get_refname_from_link(link: str) -> str:
     """
@@ -509,21 +509,30 @@ class ExoArchive(ExoFile):
         return data
 
 
-def format_ps_table(
-        ps_tbl: Any,
-        verbose: bool = False,
-    ):
-    # NOTE: Might be better to put this in the archive class
+def load_exoplanet_archive_mappings(csv_path: Union[str, Path]) -> DataFrame:
 
-    # ???: Maybe some (all?) of these should go in a separate class for PS table
-    # Map columns
-    # TODO: Update path
     label_df = read_csv(
-        "Exoplanet_Archive_Column_Mapping_CSV.csv",
+        csv_path,
         skiprows=[0, 2, 3],
         header=0,
         usecols=lambda x: not x.startswith("Unnamed: "),
     )
+
+    return label_df
+
+
+def format_ps_table(
+        ps_tbl: Any,
+        verbose: bool = False,
+    ):
+    # Map columns between PS and PS composite tables
+    try:
+        label_df = load_exoplanet_archive_mappings(ARCHIVE_CSV_PATH)
+    except:
+        param = {**Param.load().value, **{}}
+        local_path = param["archive_mappings_csv"]
+        label_df = load_exoplanet_archive_mappings(local_path)
+
     label_df_all = label_df.copy()
     label_df = label_df.dropna(subset=[PS_NAME, PC_NAME])
     label_df = label_df[~label_df[PS_NAME].str.contains("systemref")]
@@ -587,7 +596,6 @@ def compose_from_ps(
     # for each parameter individually as (I think) done for NASA archive.
 
     default_mask = ps_tbl["default_flag"] == 1
-    # NOTE: Could also but last column del here
     extended = ps_tbl[~default_mask]
     ps_tbl = ps_tbl[default_mask]
 
@@ -603,10 +611,6 @@ def compose_from_ps(
     # Separate bet
     # Group by planet's name
     grouped = extended.group_by(["pl_name"])
-
-    # Convert to the same class
-    # (astropy.table.join doesn't like to join different classes)
-    # grouped = PlanetArchive(grouped)
 
     # Complete new table with extended table
     if verbose:

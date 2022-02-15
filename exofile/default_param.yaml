@@ -16,3 +16,6 @@ exofile:
 ref_file:
   Description: string, Local exofile references to use offline.
   Value: exofile_ref.ecsv
+archive_mappings_csv:
+  Description: string, Local copy of file containing exoplanet archive CSV mappings
+  Value: Exoplanet_Archive_Column_Mapping_CSV.csv

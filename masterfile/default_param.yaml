@@ -1,0 +1,21 @@
+sheet_key:
+  Description: string, Key of the google sheet with custom values
+  Value: 14Trm-AQ2eOphfwqJYrevnDrNVk56E-aH8yvRHQLjzWg
+url:
+  Description: string, Where to find the masterfile (url)
+  Value: https://www.astro.umontreal.ca/~adb/masterfile.ecsv
+url_ref:
+  Description: string, Where to find the masterfiles references (url)
+  Value: https://www.astro.umontreal.ca/~adb/reference_file.ecsv
+custom_file:
+  Description: string, Local file with custom values. Will be used to complement the online masterfile
+  Value: masterfile_custom.ecsv
+masterfile:
+  Description: string, Local masterfile to use offline.
+  Value: masterfile.ecsv
+ref_file:
+  Description: string, Local masterfile references to use offline.
+  Value: masterfile_ref.ecsv
+archive_mappings_csv:
+  Description: string, Local copy of file containing exoplanet archive CSV mappings
+  Value: Exoplanet_Archive_Column_Mapping_CSV.csv
