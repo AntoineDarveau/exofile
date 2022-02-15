@@ -10,6 +10,8 @@ exofile/param.yaml
 old_masterfile_log.txt
 masterfile_custom.ecsv
 exofile_custom.ecsv
+exofile_ref.ecsv
+exofile.ecsv
 
 ################
 # Mac OS related
