@@ -2,20 +2,20 @@ sheet_key:
   Description: string, Key of the google sheet with custom values
   Value: 14Trm-AQ2eOphfwqJYrevnDrNVk56E-aH8yvRHQLjzWg
 url:
-  Description: string, Where to find the exofile (still named masterfile) (url)
-  Value: https://www.astro.umontreal.ca/~adb/masterfile.ecsv
-url_ref:
-  Description: string, Where to find the exofiles references (url)
-  Value: https://www.astro.umontreal.ca/~adb/reference_file.ecsv
+  Description: string, Where to find the exofile, generated from NASA composite table (url)
+  Value: https://www.astro.umontreal.ca/~adb/exofile.ecsv
+url_alt:
+  Description: string, Where to find the "alternative" exofile, generated with NASA PS table and "full-row" merge (url)
+  Value: https://www.astro.umontreal.ca/~adb/exofile_alt.ecsv
 custom_file:
   Description: string, Local file with custom values. Will be used to complement the online exofile
   Value: exofile_custom.ecsv
 exofile:
   Description: string, Local exofile to use offline.
   Value: exofile.ecsv
-ref_file:
-  Description: string, Local exofile references to use offline.
-  Value: exofile_ref.ecsv
+exofile_alt:
+  Description: string, Local alternative exofile to use offline.
+  Value: exofile_alt.ecsv
 archive_mappings_csv:
   Description: string, Local copy of file containing exoplanet archive CSV mappings
   Value: Exoplanet_Archive_Column_Mapping_CSV.csv
