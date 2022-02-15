@@ -72,12 +72,12 @@ class Param():
         except FileNotFoundError as e:
             if raise_err:
                 message = str(e) \
-                   + ". You need to configurate the masterfile. \n"  \
+                   + ". You need to configurate the exofile. \n"  \
                    + "Example:  \n"  \
-                   + ">>> from masterfile.config import edit_param  \n" \
+                   + ">>> from exofile.config import edit_param  \n" \
                    + ">>> edit_param(sheet_key='the_key_to_the_google_sheet',) \n"  \
-                   + ">>> edit_param(url='url_to_masterfile',"  \
-                   + " url_ref='url_to_masterfile_references')"
+                   + ">>> edit_param(url='url_to_exofile',"  \
+                   + " url_ref='url_to_exofile_references')"
                 raise FileNotFoundError(message)
             else:
                 configurate()
@@ -179,7 +179,7 @@ def configurate():
         with open(dir_path + 'param.yaml', 'x') as f:
             f.writelines(param)
     except FileExistsError as e:
-        message = str(e) + '. Run masterfile.config.reset_param() to delete the file.'
+        message = str(e) + '. Run exofile.config.reset_param() to delete the file.'
         raise FileExistsError(message)
         
 def reset_param():
