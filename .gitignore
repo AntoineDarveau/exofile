@@ -6,8 +6,10 @@ schema.key
 Tests_masterfile.ipynb
 private.py
 masterfile/param.yaml
+exofile/param.yaml
 old_masterfile_log.txt
 masterfile_custom.ecsv
+exofile_custom.ecsv
 
 ################
 # Mac OS related
