@@ -2,8 +2,8 @@ sheet_key:
   Description: string, Key of the google sheet with custom values
   Value: 14Trm-AQ2eOphfwqJYrevnDrNVk56E-aH8yvRHQLjzWg
 url:
-  Description: string, Where to find the exofile (url)
-  Value: https://www.astro.umontreal.ca/~adb/exofile.ecsv
+  Description: string, Where to find the exofile (still named masterfile) (url)
+  Value: https://www.astro.umontreal.ca/~adb/masterfile.ecsv
 url_ref:
   Description: string, Where to find the exofiles references (url)
   Value: https://www.astro.umontreal.ca/~adb/reference_file.ecsv
