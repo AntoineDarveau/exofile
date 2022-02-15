@@ -31,7 +31,7 @@ def get_refname_from_links(links):
     return [get_refname_from_link(link) for link in links]
 
 
-class MasterFile(Table):
+class ExoFile(Table):
 
     main_col = "pl_name"
 
@@ -50,7 +50,7 @@ class MasterFile(Table):
 
         # Initiate table with the same structure
         keys = self.keys()
-        out = MasterFile(
+        out = ExoFile(
             names=keys,
             dtype=["bytes" for k in keys],
             masked=True,
@@ -91,7 +91,7 @@ class MasterFile(Table):
         # Initiate table with the same structure
         keys = self.keys()
         mask = Table(self, copy=True, masked=True).mask
-        out = MasterFile(
+        out = ExoFile(
             names=keys, dtype=["bytes" for k in keys], masked=True, data=mask
         )
         # Remove units from column definition
@@ -276,7 +276,7 @@ class MasterFile(Table):
         main_col = main_col or other.main_col
 
         # Make sure `other` is masked
-        other = MasterFile(other, copy=True, masked=True)
+        other = ExoFile(other, copy=True, masked=True)
 
         # Save units for conversion
         units = {}
@@ -549,7 +549,7 @@ class MasterFile(Table):
         self.add_column(col)
 
 
-class GoogleSheet(MasterFile):
+class GoogleSheet(ExoFile):
 
     url_root = "https://docs.google.com/spreadsheets/d/{}/gviz/tq?tqx=out:csv&sheet={}"
 
@@ -580,7 +580,7 @@ class GoogleSheet(MasterFile):
         return table
 
 
-class BaseArchive(MasterFile):
+class BaseArchive(ExoFile):
 
     url_root = "http://exoplanetarchive.ipac.caltech.edu/cgi-bin/nstedAPI/nph-nstedAPI?"
 
