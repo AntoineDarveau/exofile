@@ -7,7 +7,7 @@ import yaml
 
 
 # --------------------------------
-# Usefull functions
+# Useful functions
 # --------------------------------
 
 def get_module_path(file):
