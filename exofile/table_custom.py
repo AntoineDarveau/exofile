@@ -6,6 +6,7 @@ import astropy.table as table
 from astropy.table.operations import _join, _merge_table_meta
 from astropy.units import Unit
 import numpy as np
+from astropy.coordinates import SkyCoord
 
 
 class MaskedColumn(table.MaskedColumn):
@@ -175,7 +176,13 @@ class Table(table.Table):
             if debug:
                 print(col, self[col].unit)
 
+            # Skip skycoord: no unit attribute
+            if isinstance(self[col], SkyCoord):
+                continue
+
             # Search for bad units
+            # TODO: check if unit is in list instead of loop and use dict
+            # to replace
             for bunit, gunit in zip(badunits, gunits):
                 if self[col].unit == bunit:
                     self[col].unit = gunit
@@ -185,6 +192,7 @@ class Table(table.Table):
                         text_frame.format(col, self[col].unit, bunit))
                     if verbose:
                         print(self.log[-1])
+                    print(self.log[-1])
 
     def cols_2_qarr(self, *keys):
         '''
@@ -227,7 +235,7 @@ class Table(table.Table):
         self[col][position] = value
 
     def complete(self, right, key=None, join_type='left',
-                 add_col=True, metadata_conflicts='warn', 
+                 add_col=True, metadata_conflicts='warn',
                  verbose=True, debug=False, **kwargs):
         """
         Add every missing data in self if present in right.
@@ -243,13 +251,23 @@ class Table(table.Table):
         if not isinstance(right, Table):
             right = Table(right)
 
-        # If not masked, simple join() will do
-        if self.masked:
+        try:
             out = self._complete(right, key=key, join_type=join_type,
                                  add_col=add_col, verbose=verbose, debug=debug)
-        else:
+        except:
+            warn("Custom table completion failed, trying default astropy join.")
+            # NOTE: This seemd to break when I tested it quickly,
+            # but I needed masking anyway so I did not get to the bottom of the problem.
+            # - Thomas
             col_name_map = OrderedDict()
-            out = _join(self, right, join_type, col_name_map, keys=key, **kwargs)
+            out = _join(
+                self,
+                right,
+                join_type=join_type,
+                col_name_map=col_name_map,
+                keys=key,
+                **kwargs
+            )
 
         # Merge the column and table meta data. Table subclasses might override
         # these methods for custom merge behavior.
@@ -361,9 +379,9 @@ def difference(left, right):
         return NotImplemented
 
 
-def intersection(self, other):
-    if isinstance(self, list):
-        return list(set(self).intersection(other))
+def intersection(tbl, other):
+    if isinstance(tbl, list):
+        return list(set(tbl).intersection(other))
     else:
         return NotImplemented
 
