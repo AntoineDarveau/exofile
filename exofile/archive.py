@@ -691,11 +691,7 @@ def compose_from_ps(
         )
 
     # Fill all the values we can until nothing left or ps is completely filled
-    i = 0
     while len(grouped) > 1 and ps_tbl.has_masked_values:
-
-        print(f"Pass {i}")
-        i+=1
 
         # Groupe by planet name
         grouped = grouped.group_by(["pl_name"])
