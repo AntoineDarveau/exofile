@@ -1,0 +1,7 @@
+pl_name,mypar,myparerr1,myparerr2,mypar_reflink,default_flag
+Cool-planet b,0.5,0.01,0.01,myref1,1
+Other-planet c,nan,nan,nan,,1
+Cool-planet b,0.8,0.1,0.1,myref2,0
+Other-planet c,0.2,0.02,0.02,myref2,0
+Cool-planet b,0.9,0.2,0.2,myref3,0
+Other-planet c,0.5,0.2,0.2,myref3,0
