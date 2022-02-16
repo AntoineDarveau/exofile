@@ -1,7 +1,7 @@
 from warnings import warn
 import numpy as np
-from masterfile.archive import load_exoplanet_archive_mappings, ExoArchive, difference
-from masterfile.table_custom import MaskedColumn
+from exofile.archive import load_exoplanet_archive_mappings, ExoArchive, difference
+from exofile.table_custom import MaskedColumn
 
 
 def migrate_table(old_tbl, old_ref):
