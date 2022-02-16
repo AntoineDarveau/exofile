@@ -9,10 +9,11 @@ masterfile/param.yaml
 exofile/param.yaml
 old_masterfile_log.txt
 masterfile_custom.ecsv
-exofile_custom.ecsv
-exofile_ref.ecsv
 exofile.ecsv
 exofile_alt.ecsv
+exofile_custom.ecsv
+exofile_ref.ecsv
+Exoplanet_Archive_Column_Mapping_CSV.csv
 
 ################
 # Mac OS related

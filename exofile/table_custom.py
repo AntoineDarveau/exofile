@@ -1,12 +1,12 @@
+from collections import OrderedDict
+from warnings import warn
+
 from astropy.table import join
 import astropy.table as table
 from astropy.table.operations import _join, _merge_table_meta
+from astropy.units import Unit
 import numpy as np
-from collections import OrderedDict
-from astropy.units import Unit, UnitTypeError 
-# import warnings
-from warnings import warn
-# from astropy.utils.exceptions import AstropyUserWarning
+from astropy.coordinates import SkyCoord
 
 
 class MaskedColumn(table.MaskedColumn):
@@ -41,6 +41,7 @@ class MaskedColumn(table.MaskedColumn):
             # Convert to masked array
             return np.ma.array(data.value, mask=mask)
 
+
 class Column(table.Column):
 
     def find(self, sub, start=0, end=None):
@@ -51,7 +52,7 @@ class Column(table.Column):
 
         else:
             return NotImplemented
-        
+
     def to_array(self, units=None):
         """
         Returns the columns as an array.
@@ -98,7 +99,7 @@ class Table(table.Table):
         else:
             raise TypeError("Input must be a Masked Table." +
                             "\n \t Set its mask to True before calling" +
-                            " (example: t = Table(t,masked=True)).")
+                            " (example: t = Table(t, masked=True, copy=False)).")
 
     def by_pl_name(self, *plName, name_key=None, remove=False):
         """
@@ -113,12 +114,12 @@ class Table(table.Table):
             self.remove_row(int(position[0]))
 
         return out
-    
+
     def by_plName(self, *args, **kwargs):
         """
         Old name of by_pl_name. Just an alias
         """
-        
+
         return self.by_pl_name(*args, **kwargs)
 
     def get_index(self, *plName, name_key=None):
@@ -132,7 +133,7 @@ class Table(table.Table):
         for pl in plName:
             try:
                 position.append(int(self[name_key].find(pl)[0]))
-                
+
             except TypeError:
                 values = ', '.join(self[name_key].find(pl)[1])
                 if values:
@@ -146,7 +147,7 @@ class Table(table.Table):
                     )
         
         return position
-    
+
     def set_main_col(self, colname=None, extension='_temp'):
         '''
         Set self.main_col and assign it to the first column.
@@ -157,12 +158,12 @@ class Table(table.Table):
             self.main_col = colname
         elif colname is None:
             colname = self.main_col
-        
+
         colname_temp = colname+extension
         self.rename_column(colname, colname_temp)
         self.add_column(self[colname_temp], name=colname, index=0)
         self.remove_column(colname_temp)
-    
+
     def correct_units(self, badunits=['degrees', 'days', 'hours','jovMass', 'mags'],
                      gunits=['degree', 'day', 'hour','jupiterMass', 'mag'], verbose=True,
                      debug=False):
@@ -175,16 +176,23 @@ class Table(table.Table):
             if debug:
                 print(col, self[col].unit)
 
+            # Skip skycoord: no unit attribute
+            if isinstance(self[col], SkyCoord):
+                continue
+
             # Search for bad units
+            # TODO: check if unit is in list instead of loop and use dict
+            # to replace
             for bunit, gunit in zip(badunits, gunits):
                 if self[col].unit == bunit:
                     self[col].unit = gunit
-                    
+
                     # Message and log it
                     self.log.append(
                         text_frame.format(col, self[col].unit, bunit))
                     if verbose:
                         print(self.log[-1])
+                    print(self.log[-1])
 
     def cols_2_qarr(self, *keys):
         '''
@@ -227,7 +235,7 @@ class Table(table.Table):
         self[col][position] = value
 
     def complete(self, right, key=None, join_type='left',
-                 add_col=True, metadata_conflicts='warn', 
+                 add_col=True, metadata_conflicts='warn',
                  verbose=True, debug=False, **kwargs):
         """
         Add every missing data in self if present in right.
@@ -243,13 +251,23 @@ class Table(table.Table):
         if not isinstance(right, Table):
             right = Table(right)
 
-        # If not masked, simple join() will do
-        if self.masked:
+        try:
             out = self._complete(right, key=key, join_type=join_type,
                                  add_col=add_col, verbose=verbose, debug=debug)
-        else:
+        except:
+            warn("Custom table completion failed, trying default astropy join.")
+            # NOTE: This seemd to break when I tested it quickly,
+            # but I needed masking anyway so I did not get to the bottom of the problem.
+            # - Thomas
             col_name_map = OrderedDict()
-            out = _join(self, right, join_type, col_name_map, keys=key, **kwargs)
+            out = _join(
+                self,
+                right,
+                join_type=join_type,
+                col_name_map=col_name_map,
+                keys=key,
+                **kwargs
+            )
 
         # Merge the column and table meta data. Table subclasses might override
         # these methods for custom merge behavior.
@@ -335,9 +353,9 @@ class Table(table.Table):
         # Define column and add it
         col = MaskedColumn(*args, data=fct(*f_args, **f_kwargs), **kwargs)
         self.add_column(col)
-        
+
     def check_col_units(self, colname):
-        
+
         col_units = self[colname].unit
         try:  # Check if col_units valid
             1. * Unit(col_units)
@@ -361,18 +379,16 @@ def difference(left, right):
         return NotImplemented
 
 
-def intersection(self, other):
-    if isinstance(self, list):
-        return list(set(self).intersection(other))
+def intersection(tbl, other):
+    if isinstance(tbl, list):
+        return list(set(tbl).intersection(other))
     else:
         return NotImplemented
-    
+
+
 def print_unit_error(str_unit):
-    
+
     try:
         Unit(str_unit)
     except ValueError as e:
         print(e)
-
-                    
-                 

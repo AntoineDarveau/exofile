@@ -1,30 +1,58 @@
-# Librairy imports
 import re
-# from numpy import where, array
 from warnings import warn
+from pathlib import Path
+from typing import Any, List, Optional, Tuple, Union
 
 import numpy as np
 import requests
 from astropy.time import Time
 from astropy.units import Unit
+from astroquery.ipac.nexsci.nasa_exoplanet_archive import NasaExoplanetArchive
+from pandas import read_csv, DataFrame
 
 from .config import Param
 from .exceptions import (ColUnitsWarning, GetLocalFileWarning, NoUnitsWarning,
                          QueryFileWarning)
-# Local imports
-from .table_custom import MaskedColumn, Table
+from .table_custom import MaskedColumn, Table, difference
 
 
-def get_refname_from_link(link):
+# Columns that are missing in archive even though listed in master CSV mappign
+MISSING_COLS = [
+    "raerr1",
+    "raerr2",
+    "decerr1",
+    "decerr2",
+    "glaterr1",
+    "glaterr2",
+    "glonerr1",
+    "glonerr2",
+    "elaterr1",
+    "elaterr2",
+    "elonerr1",
+    "elonerr2",
+]
+PS_NAME = "Planetary Systems (PS)"
+PC_NAME = "Planetary Systems Composite Parameters (PSCP)"
+ARCHIVE_CSV_PATH = "https://exoplanetarchive.ipac.caltech.edu/docs/Exoplanet_Archive_Column_Mapping_CSV.csv"
+
+def get_refname_from_link(link: str) -> str:
     """
     Get the text from a reflink
     """
-    out = re.search(">(.*)</a>", link).group(1)
+    if link != "":
+        res = re.search(">(.*)</a>", link)
+        if res is not None:
+            out = res.group(1)
+        else:
+            warn(f"Regex result for link {link} is None, returning input link")
+            out = link
+    else:
+        out = link
 
-    return out.strip()
+    return out
 
 
-def get_refname_from_links(links):
+def get_refname_from_links(links: List[str]) -> List[str]:
     """
     Get the text from multiple reflinks
     """
@@ -35,81 +63,9 @@ class ExoFile(Table):
 
     main_col = "pl_name"
 
-    def mk_ref_table(self, ref_link=True, ref_col="mpl_reflink"):
-        """
-        Return a table with the same structure as self, but with the
-        name of the reference at each position.
-
-        Parameters:
-        - ref_link: bool
-            Extract the reference name from a url link using
-            the function get_refname_from_links
-        - ref_col: string
-            Which column to use as the reference
-        """
-
-        # Initiate table with the same structure
-        keys = self.keys()
-        out = ExoFile(
-            names=keys,
-            dtype=["bytes" for k in keys],
-            masked=True,
-            data=self.mask.copy(),
-        )
-        # Remove units from column definition
-        for key in out.keys():
-            out[key].unit = None
-
-        # Get all references
-        if ref_link:
-            refs = get_refname_from_links(self[ref_col])
-        else:
-            refs = MaskedColumn(self[ref_col], dtype="bytes")
-
-        # Put the ref in each columns
-        for key in keys:
-            out[key] = refs
-
-        out["pl_name"] = self["pl_name"]  # Keep the planet name
-        out.mask = self.mask  # Keep mask
-
-        return out
-
-    def mk_unique_ref_table(self, ref="No Ref"):
-        """
-        Return a table with the same structure as self, but with the
-        name of the reference at each position.
-
-        Parameters:
-        - ref_link: bool
-            Extract the reference name from a url link using
-            the function get_refname_from_links
-        - ref_col: string
-            Which column to use as the reference
-        """
-
-        # Initiate table with the same structure
-        keys = self.keys()
-        mask = Table(self, copy=True, masked=True).mask
-        out = ExoFile(
-            names=keys, dtype=["bytes" for k in keys], masked=True, data=mask
-        )
-        # Remove units from column definition
-        for key in out.keys():
-            out[key].unit = None
-
-        refs = MaskedColumn([ref for lines in self], dtype="bytes")
-
-        # Put the ref in each columns
-        for key in keys:
-            out[key] = refs
-
-        out["pl_name"] = self["pl_name"]  # Keep the planet name
-        out.mask = mask  # Keep mask
-
-        return out
-
-    def get_colnames_with_error(self, err_ext=["err1", "err2"]):
+    def get_colnames_with_error(
+            self, err_ext: List[str] = ["err1", "err2"]
+        ) -> Tuple[str]:
         """
         Find all columns with an error column associate`.
         `err_ext` is the list of extensions for the name of the error columns.
@@ -171,100 +127,6 @@ class ExoFile(Table):
                 if imask.any():
                     self[col].mask[imask] = True
 
-    @staticmethod
-    def update(sort_keys=None, verbose=True):
-        """
-        Returns an updated exofile built with the NasaExoplanetArchive.
-
-        Parameters
-        ----------
-        sort_keys : str or list of str
-            The key(s) to order the table by (passed to `astropy.table.sort`).
-            If None, use the column 'today_tranmid_err'.
-        """
-        # Default sort keys
-        if sort_keys is None:
-            sort_keys = ["today_pl_tranmiderr1", "today_pl_orbtpererr1"]
-
-        # Read new database from exoplanet archive
-        if verbose:
-            print("Query Confirmed Planet Table...", end="")
-
-        new = PlanetArchive.query()
-
-        if verbose:
-            print("Done")
-
-        # Read new extended database from exoplanet archive to complete it
-        if verbose:
-            print("Query extended database....", end="")
-
-        extended = ExtendedArchive.query()
-
-        if verbose:
-            print("Done")
-
-        # Change columns names to match confirmed planet table
-        extended.ch_col_names()
-
-        # Remove used reference (already in Planet table)
-        (index,) = np.where(extended["mpl_def"])
-        extended.remove_rows(index)
-
-        # Add estimate of transit mid time error as of today
-        extended.estim_ephemeride_err()
-
-        # Add estimate of transit mid time error as of today
-        extended.estim_ephemeride_err(ephemeride="pl_orbtper")
-
-        # Sort to choose the reference accordingly
-        extended.sort(sort_keys)
-
-        # Group by planet's name
-        grouped = extended.group_by(["pl_name"])
-
-        # Define a separate reference table
-        if verbose:
-            print("Building new reference table...", end="")
-
-        keys = extended.keys()
-        ref_table = new.mk_ref_table(ref_link=False, ref_col="pl_def_refname")
-
-        if verbose:
-            print("Done")
-
-        # Convert to the same class
-        # (astropy.table.join doesn't like to join different classes)
-        grouped = PlanetArchive(grouped)
-
-        # Complete new table with extended table
-        if verbose:
-            print(
-                "Completing database with extended database (may take some time)...",
-                end="",
-            )
-
-        while len(grouped) > 1:
-
-            # Groupe by planet name
-            grouped = grouped.group_by(["pl_name"])
-            index = grouped.groups.indices[:-1]
-
-            # Add to master table
-            new = new.complete(grouped[index], "pl_name", add_col=False, verbose=False)
-
-            # Add ref to ref_table
-            ref = grouped[index].mk_ref_table()
-            ref_table = ref_table.complete(ref, "pl_name", add_col=False, verbose=False)
-
-            # Remove from the main table
-            grouped.remove_rows(index)
-
-        if verbose:
-            print("Done")
-
-        return new, ref_table
-
     def replace_with(self, other, main_col=None):
         """
         Use all non-masked values of `other` to replace values in `self`.
@@ -323,7 +185,14 @@ class ExoFile(Table):
                     self[i_self][key] = other[i_other][key] * conversion
 
     @classmethod
-    def query(cls, url_key="url", debug=False, exofile_kwargs=None, **kwargs):
+    def query(
+            cls,
+            url_key="url",
+            debug=False,
+            exofile_kwargs=None,
+            use_alt_file=False,
+            **kwargs
+        ):
         """
         Query the exofile and try to complement it with
         the custom table (google sheet).
@@ -341,20 +210,25 @@ class ExoFile(Table):
         # Use input arguments if given
         param = {**param, **kwargs.pop("param", {})}
 
+        alt_str = "_alt" if use_alt_file else ""
+
         try:
             # Get combined table
             master = requests.get(param[url_key])
+            master.raise_for_status()
             # Convert to table
             master = cls.read(master.text, format="ascii")
-        except requests.exceptions.SSLError:
-            # If SSLError, maybe just the exofile website is problem,
+        except (requests.exceptions.SSLError, requests.exceptions.HTTPError):
+            # If SSLError or HTTPError, maybe just the exofile website is problem,
             # still try local file and then google sheet for custom
+            # Handling this here allows using the Google sheet even if online exofile
+            # not available
             try:
-                master = cls.read(param["exofile"], **exofile_kwargs)
+                master = cls.read(param[f"exofile{alt_str}"], **exofile_kwargs)
             except Exception as e:
                 if debug == "raise":
                     raise e
-                warn(GetLocalFileWarning(file="exofile", err=e))
+                warn(GetLocalFileWarning(file=f"exofile{alt_str}", err=e))
 
         # Try to complement with custom values
         try:
@@ -378,6 +252,7 @@ class ExoFile(Table):
         debug=None,
         query_kwargs=None,
         exofile_kwargs=None,
+        use_alt_file=False,
         **kwargs,
     ):
         """
@@ -395,6 +270,8 @@ class ExoFile(Table):
         - exofile_kwargs: None or dictionnary
             Passed to table.read() when reading the local exofile
             (see astropy.table.read)
+        - use_alt_file: bool
+            Use alternative exofile with the row-by-row composite table
         - kwargs
             Passed to table.read() when reading the custom table
             (see astropy.table.read)
@@ -411,6 +288,8 @@ class ExoFile(Table):
         # Use module parameters and complete with input parameters
         param = {**Param.load().value, **param}
 
+        alt_str = "_alt" if use_alt_file else ""
+
         ###########################
         # Complement the exofile
         ###########################
@@ -419,22 +298,27 @@ class ExoFile(Table):
             # Try to query the complemented exofile.
             # If impossible, set query to False
             try:
-                master = cls.query(**query_kwargs, exofile_kwargs=exofile_kwargs)
+                master = cls.query(
+                    **query_kwargs,
+                    url_key=f"url{alt_str}",
+                    exofile_kwargs=exofile_kwargs,
+                    use_alt_file=use_alt_file,
+                )
             except Exception as e:
                 if debug == "raise":
                     raise e
-                warn(QueryFileWarning(file="exofile", err=e))
+                warn(QueryFileWarning(file=f"exofile{alt_str}", err=e))
                 query = False
 
         # Read local exofile if query is False or query failed
         if not query:
             # Try to read locally
             try:
-                master = cls.read(param["exofile"], **exofile_kwargs)
+                master = cls.read(param[f"exofile{alt_str}"], **exofile_kwargs)
             except Exception as e:
                 if debug == "raise":
                     raise e
-                warn(GetLocalFileWarning(file="exofile", err=e))
+                warn(GetLocalFileWarning(file=f"exofile{alt_str}", err=e))
                 # Return custom_file as last ressort
                 return cls.read(param["custom_file"], **kwargs)
 
@@ -449,71 +333,23 @@ class ExoFile(Table):
 
         return master
 
-    @classmethod
-    def load_ref(cls, query=True, param=None, debug=None, **kwargs):
-        """
-        Returns the exofile reference table complemented.
-        Parameters
-        - param: dict
-            dictionnairy of the local files names. Default is param file.
-            keys: 'exofile' and 'custom_file'
-            `custom_file` will be use to replace values in the exofile.
-            `exofile` is the local exofile.
-        - query: bool
-            query or not the exofile. If False, simply read `custom_file`
-        - kwargs are passed to query() method
-        """
-        # Assign default values
-        if param is None:
-            param = {}  # Never put {} in the function definition
-        param = {**Param.load().value, **param}
+    def fill_custom_ref(self, default_ref="custom ref"):
 
-        ###########################
-        # Complement the exofile
-        ###########################
-        # Query online if True
-        if query:
-            # Try to query the complemented exofile.
-            # If impossible, set query to False
-            try:
-                master = cls.query(
-                    url_key="url_ref", sheet_name="Ref", keep_units=False
+        # Fill ref if not set by user
+        for col in self.colnames:
+            # Don't reflink the reflinks
+            if "_reflink" in col:
+                continue
+
+            rname = f"{col}_reflink"
+            if rname not in self.colnames and col != self.main_col:
+                self[rname] = MaskedColumn(
+                    data=[default_ref] * len(self), mask=self[col].mask
                 )
-            except Exception as e:
-                if debug == "raise":
-                    raise e
-                warn(QueryFileWarning(file="reference file", err=e))
-                query = False
 
-        # Read local exofile if query is False or query failed
-        if not query:
-            # Try to read locally
-            try:
-                master = cls.read(param["ref_file"])
-            except Exception as e:
-                if debug == "raise":
-                    raise e
-                warn(GetLocalFileWarning(file="reference file", err=e))
-                # Return 'custom ref' everywhere as last resort
-                custom = cls.read(param["custom_file"])
-                return custom.mk_unique_ref_table("custom ref")
+    def write_to_custom(self, *args, default_ref="custom ref", **kwargs):
 
-        # Finally, complement with the local `custom_file`
-        try:
-            # Read the file
-            custom = cls.read(param["custom_file"])
-            # Convert in a reference table
-            custom = custom.mk_unique_ref_table("custom ref")
-            # Edit master ref table
-            master.replace_with(custom)
-        except Exception as e:
-            if debug == "raise":
-                raise e
-            warn(GetLocalFileWarning(file="custom file", err=e))
-
-        return master
-
-    def write_to_custom(self, *args, **kwargs):
+        self.fill_custom_ref(default_ref=default_ref)
 
         file = Param.load().value["custom_file"]
         self.write(file, *args, **kwargs)
@@ -548,6 +384,74 @@ class ExoFile(Table):
         col = MaskedColumn(error_today, unit="d", name=f"today_{ephemeride}{err_ext}")
         self.add_column(col)
 
+    @staticmethod
+    def update(
+            sort_keys: Optional[Union[str, List[str]]] = None,
+            verbose: bool = True,
+            use_composite_archive: bool = True,
+            local_table: Optional[Union[str, Path]] = None,
+        ):
+        """
+        Returns an updated masterfile built with the NasaExoplanetArchive.
+
+        Parameters
+        ----------
+        sort_keys : str or list of str
+            The key(s) to order the table by (passed to `astropy.table.sort`).
+            If None, use the column 'today_tranmid_err'.
+        """
+        # Default sort keys
+        if sort_keys is None:
+            sort_keys = ["today_pl_tranmiderr1", "today_pl_orbtpererr1"]
+
+        # Read new database from exoplanet archive
+        if use_composite_archive:
+            tbl_id = "pscomppars"
+            tbl_name = PC_NAME
+        else:
+            tbl_id = "ps"
+            tbl_name = PS_NAME
+
+        if verbose:
+            print(f"Querying {tbl_name}...", end="")
+
+        # TODO: Make sure OK with composite tbl kwd if keep this
+        if local_table is not None:
+            new = ExoArchive.read(local_table)
+            new = ExoArchive.format_table(new)
+        else:
+            new = ExoArchive.query(table=tbl_id)
+
+        if not use_composite_archive:
+            new = format_ps_table(new, verbose=verbose)
+            new = compose_from_ps(new, sort_keys, verbose=verbose)
+
+            # Get actual pc columns to compare with what's left.
+            # Using CSV from Archive deletes too many columns
+            pc_cols = ExoArchive.query(select="top 1 *").colnames
+
+            # Now remove extra columns
+            dlist = difference(new.colnames, pc_cols)
+            del new[dlist]
+
+            # Index with same order as pc_cols
+            new = new[pc_cols]
+
+            # Safety check
+            if len(difference(new.colnames, pc_cols)) > 0 or len(difference(pc_cols, new.colnames)):
+                raise RuntimeError(
+                    f"The formatted {tbl_id} table is incompatible with the masterfile/composite table format"
+                )
+
+        if verbose:
+            print("Done")
+
+        ref_cols = [cn for cn in new.colnames if cn.endswith("reflink")]
+        for cname in ref_cols:
+            new[cname] = get_refname_from_links(new[cname])
+
+        return new
+
 
 class GoogleSheet(ExoFile):
 
@@ -580,25 +484,63 @@ class GoogleSheet(ExoFile):
         return table
 
 
-class BaseArchive(ExoFile):
-
-    url_root = "http://exoplanetarchive.ipac.caltech.edu/cgi-bin/nstedAPI/nph-nstedAPI?"
+class ExoArchive(ExoFile):
 
     @classmethod
-    def _query(cls, url_tail):
+    def query(
+            cls,
+            table: str = "pscomppars",
+            **criteria,
+        ):
         """
-        Get the extended planet table from exoplanet archive
+        Query the NASA exoplanet using astroquery and return in a MasterFile object.
+        Returns the full table by default
+        Accepts the same criteria asu
+        `astroquery.ipac.nexsci.nasa_exoplanet_archive.NasaExoplanetArchive.query_criteria()`
         """
-        # Query
-        data = requests.get(cls.url_root + url_tail)
+        # Query and get astropy table
+        data = NasaExoplanetArchive.query_criteria(table=table, **criteria)
 
-        # Convert to an astropy Table
-        data = cls.read(data.text, format="ascii")
+        # Covnert to custom table
+        data = cls(data, masked=True, copy=False)
 
-        # Correct
+        # sky_coord is duplicate of RA and DEC and causes problems with units and masking
+        if "sky_coord" in data.colnames:
+            del data["sky_coord"]
+
+        # Correct units
+        # ???: Is this still required now that we use astroquery ?
         data.correct_units(verbose=False)
 
         # Mask where errors are not available
+        # NOTE: Calling separately because if the default (err1,err2) gives a KeyError,
+        # we can try with err separately
+        data.mask_no_errors()  # err1 and err2 cols
+        data.mask_no_errors(err_ext=["err"])  # err cols
+
+        # Mask where errors are set to zero
+        data.mask_zero_errors()  # err1 and err2 cols
+        data.mask_zero_errors(err_ext=["err"])  # err cols
+
+        return data
+
+    @classmethod
+    def format_table(cls, data):
+
+        # Covnert to custom table
+        data = cls(data, masked=True, copy=False)
+
+        # sky_coord is duplicate of RA and DEC and causes problems with units and masking
+        if "sky_coord" in data.colnames:
+            del data["sky_coord"]
+
+        # Correct units
+        # ???: Is this still required now that we use astroquery ?
+        data.correct_units(verbose=False)
+
+        # Mask where errors are not available
+        # NOTE: Calling separately because if the default (err1,err2) gives a KeyError,
+        # we can try with err separately
         data.mask_no_errors()  # err1 and err2 cols
         data.mask_no_errors(err_ext=["err"])  # err cols
 
@@ -609,350 +551,140 @@ class BaseArchive(ExoFile):
         return data
 
 
-class PlanetArchive(BaseArchive):
+def load_exoplanet_archive_mappings(
+        csv_path: Optional[Union[str, Path]] = None
+    ) -> DataFrame:
 
-    main_col = "pl_name"
+    csv_path = csv_path or ARCHIVE_CSV_PATH
+    label_df = read_csv(
+        csv_path,
+        skiprows=[0, 2, 3],
+        header=0,
+        usecols=lambda x: not x.startswith("Unnamed: "),
+    )
 
-    @classmethod
-    def query(cls, url_tail="table=exoplanets&select=*&format=ascii"):
-        """
-        Get the extended planet table from exoplanet archive
-        """
-        return cls._query(url_tail)
+    return label_df
 
 
-class ExtendedArchive(BaseArchive):
-    @classmethod
-    def query(cls, url_tail="table=exomultpars&select=*&format=ascii"):
-        """
-        Get the extended planet table from exoplanet archive
-        """
-        return cls._query(url_tail)
+def format_ps_table(
+        ps_tbl: Any,
+        verbose: bool = False,
+    ):
+    # Map columns between PS and PS composite tables
+    try:
+        label_df = load_exoplanet_archive_mappings()
+    except:
+        param = {**Param.load().value, **{}}
+        local_path = param["archive_mappings_csv"]
+        label_df = load_exoplanet_archive_mappings(local_path)
 
-    def ch_col_names(self):
-        """
-        Give the same name as the Confirmed Planet table.
-        """
+    label_df_all = label_df.copy()
+    label_df = label_df.dropna(subset=[PS_NAME, PC_NAME])
+    label_df = label_df[~label_df[PS_NAME].str.contains("systemref")]
+    label_ps = label_df[PS_NAME].str.strip()
+    label_pc = label_df[PC_NAME].str.strip()
 
-        self.rename_columns(
-            [
-                "mpl_hostname",
-                "mpl_letter",
-                "mpl_discmethod",
-                "mpl_pnum",
-                "mpl_orbper",
-                "mpl_orbpererr1",
-                "mpl_orbpererr2",
-                "mpl_orbperlim",
-                "mpl_orbsmax",
-                "mpl_orbsmaxerr1",
-                "mpl_orbsmaxerr2",
-                "mpl_orbsmaxlim",
-                "mpl_orbeccen",
-                "mpl_orbeccenerr1",
-                "mpl_orbeccenerr2",
-                "mpl_orbeccenlim",
-                "mpl_orbincl",
-                "mpl_orbinclerr1",
-                "mpl_orbinclerr2",
-                "mpl_orbincllim",
-                "mpl_bmassj",
-                "mpl_bmassjerr1",
-                "mpl_bmassjerr2",
-                "mpl_bmassjlim",
-                "mpl_bmassprov",
-                "mpl_radj",
-                "mpl_radjerr1",
-                "mpl_radjerr2",
-                "mpl_radjlim",
-                "mpl_dens",
-                "mpl_denserr1",
-                "mpl_denserr2",
-                "mpl_denslim",
-                "ra_str",
-                "dec_str",
-                "ra",
-                "dec",
-                "mst_teff",
-                "mst_tefferr1",
-                "mst_tefferr2",
-                "mst_tefflim",
-                "mst_mass",
-                "mst_masserr1",
-                "mst_masserr2",
-                "mst_masslim",
-                "mst_rad",
-                "mst_raderr1",
-                "mst_raderr2",
-                "mst_radlim",
-                "rowupdate",
-                "mpl_name",
-                "mpl_tranflag",
-                "mpl_rvflag",
-                "mpl_ttvflag",
-                "mpl_orbtper",
-                "mpl_orbtpererr1",
-                "mpl_orbtpererr2",
-                "mpl_orbtperlim",
-                "mpl_orblper",
-                "mpl_orblpererr1",
-                "mpl_orblpererr2",
-                "mpl_orblperlim",
-                "mpl_rvamp",
-                "mpl_rvamperr1",
-                "mpl_rvamperr2",
-                "mpl_rvamplim",
-                "mpl_eqt",
-                "mpl_eqterr1",
-                "mpl_eqterr2",
-                "mpl_eqtlim",
-                "mpl_insol",
-                "mpl_insolerr1",
-                "mpl_insolerr2",
-                "mpl_insollim",
-                "mpl_massj",
-                "mpl_massjerr1",
-                "mpl_massjerr2",
-                "mpl_massjlim",
-                "mpl_msinij",
-                "mpl_msinijerr1",
-                "mpl_msinijerr2",
-                "mpl_msinijlim",
-                "mpl_masse",
-                "mpl_masseerr1",
-                "mpl_masseerr2",
-                "mpl_masselim",
-                "mpl_msinie",
-                "mpl_msinieerr1",
-                "mpl_msinieerr2",
-                "mpl_msinielim",
-                "mpl_bmasse",
-                "mpl_bmasseerr1",
-                "mpl_bmasseerr2",
-                "mpl_bmasselim",
-                "mpl_rade",
-                "mpl_radeerr1",
-                "mpl_radeerr2",
-                "mpl_radelim",
-                "mpl_rads",
-                "mpl_radserr1",
-                "mpl_radserr2",
-                "mpl_trandep",
-                "mpl_trandeperr1",
-                "mpl_trandeperr2",
-                "mpl_trandeplim",
-                "mpl_trandur",
-                "mpl_trandurerr1",
-                "mpl_trandurerr2",
-                "mpl_trandurlim",
-                "mpl_tranmid",
-                "mpl_tranmiderr1",
-                "mpl_tranmiderr2",
-                "mpl_tranmidlim",
-                "mpl_tsystemref",
-                "mpl_imppar",
-                "mpl_impparerr1",
-                "mpl_impparerr2",
-                "mpl_impparlim",
-                "mpl_occdep",
-                "mpl_occdeperr1",
-                "mpl_occdeperr2",
-                "mpl_occdeplim",
-                "mpl_ratdor",
-                "mpl_ratdorerr1",
-                "mpl_ratdorerr2",
-                "mpl_ratdorlim",
-                "mpl_ratror",
-                "mpl_ratrorerr1",
-                "mpl_ratrorerr2",
-                "mpl_ratrorlim",
-                "mpl_disc",
-                "mpl_status",
-                "mpl_mnum",
-                "mpl_publ_date",
-                "hd_name",
-                "hip_name",
-                "mst_logg",
-                "mst_loggerr1",
-                "mst_loggerr2",
-                "mst_logglim",
-                "mst_lum",
-                "mst_lumerr1",
-                "mst_lumerr2",
-                "mst_lumlim",
-                "mst_dens",
-                "mst_denserr1",
-                "mst_denserr2",
-                "mst_denslim",
-                "mst_metfe",
-                "mst_metfeerr1",
-                "mst_metfeerr2",
-                "mst_metfelim",
-                "mst_metratio",
-                "mst_age",
-                "mst_ageerr1",
-                "mst_ageerr2",
-                "mst_agelim",
-                "swasp_id",
-            ],
-            [
-                "pl_hostname",
-                "pl_letter",
-                "pl_discmethod",
-                "pl_pnum",
-                "pl_orbper",
-                "pl_orbpererr1",
-                "pl_orbpererr2",
-                "pl_orbperlim",
-                "pl_orbsmax",
-                "pl_orbsmaxerr1",
-                "pl_orbsmaxerr2",
-                "pl_orbsmaxlim",
-                "pl_orbeccen",
-                "pl_orbeccenerr1",
-                "pl_orbeccenerr2",
-                "pl_orbeccenlim",
-                "pl_orbincl",
-                "pl_orbinclerr1",
-                "pl_orbinclerr2",
-                "pl_orbincllim",
-                "pl_bmassj",
-                "pl_bmassjerr1",
-                "pl_bmassjerr2",
-                "pl_bmassjlim",
-                "pl_bmassprov",
-                "pl_radj",
-                "pl_radjerr1",
-                "pl_radjerr2",
-                "pl_radjlim",
-                "pl_dens",
-                "pl_denserr1",
-                "pl_denserr2",
-                "pl_denslim",
-                "ra_str",
-                "dec_str",
-                "ra",
-                "dec",
-                "st_teff",
-                "st_tefferr1",
-                "st_tefferr2",
-                "st_tefflim",
-                "st_mass",
-                "st_masserr1",
-                "st_masserr2",
-                "st_masslim",
-                "st_rad",
-                "st_raderr1",
-                "st_raderr2",
-                "st_radlim",
-                "rowupdate",
-                "pl_name",
-                "pl_tranflag",
-                "pl_rvflag",
-                "pl_ttvflag",
-                "pl_orbtper",
-                "pl_orbtpererr1",
-                "pl_orbtpererr2",
-                "pl_orbtperlim",
-                "pl_orblper",
-                "pl_orblpererr1",
-                "pl_orblpererr2",
-                "pl_orblperlim",
-                "pl_rvamp",
-                "pl_rvamperr1",
-                "pl_rvamperr2",
-                "pl_rvamplim",
-                "pl_eqt",
-                "pl_eqterr1",
-                "pl_eqterr2",
-                "pl_eqtlim",
-                "pl_insol",
-                "pl_insolerr1",
-                "pl_insolerr2",
-                "pl_insollim",
-                "pl_massj",
-                "pl_massjerr1",
-                "pl_massjerr2",
-                "pl_massjlim",
-                "pl_msinij",
-                "pl_msinijerr1",
-                "pl_msinijerr2",
-                "pl_msinijlim",
-                "pl_masse",
-                "pl_masseerr1",
-                "pl_masseerr2",
-                "pl_masselim",
-                "pl_msinie",
-                "pl_msinieerr1",
-                "pl_msinieerr2",
-                "pl_msinielim",
-                "pl_bmasse",
-                "pl_bmasseerr1",
-                "pl_bmasseerr2",
-                "pl_bmasselim",
-                "pl_rade",
-                "pl_radeerr1",
-                "pl_radeerr2",
-                "pl_radelim",
-                "pl_rads",
-                "pl_radserr1",
-                "pl_radserr2",
-                "pl_trandep",
-                "pl_trandeperr1",
-                "pl_trandeperr2",
-                "pl_trandeplim",
-                "pl_trandur",
-                "pl_trandurerr1",
-                "pl_trandurerr2",
-                "pl_trandurlim",
-                "pl_tranmid",
-                "pl_tranmiderr1",
-                "pl_tranmiderr2",
-                "pl_tranmidlim",
-                "pl_tsystemref",
-                "pl_imppar",
-                "pl_impparerr1",
-                "pl_impparerr2",
-                "pl_impparlim",
-                "pl_occdep",
-                "pl_occdeperr1",
-                "pl_occdeperr2",
-                "pl_occdeplim",
-                "pl_ratdor",
-                "pl_ratdorerr1",
-                "pl_ratdorerr2",
-                "pl_ratdorlim",
-                "pl_ratror",
-                "pl_ratrorerr1",
-                "pl_ratrorerr2",
-                "pl_ratrorlim",
-                "pl_disc",
-                "pl_status",
-                "pl_mnum",
-                "pl_publ_date",
-                "hd_name",
-                "hip_name",
-                "st_logg",
-                "st_loggerr1",
-                "st_loggerr2",
-                "st_logglim",
-                "st_lum",
-                "st_lumerr1",
-                "st_lumerr2",
-                "st_lumlim",
-                "st_dens",
-                "st_denserr1",
-                "st_denserr2",
-                "st_denslim",
-                "st_metfe",
-                "st_metfeerr1",
-                "st_metfeerr2",
-                "st_metfelim",
-                "st_metratio",
-                "st_age",
-                "st_ageerr1",
-                "st_ageerr2",
-                "st_agelim",
-                "swasp_id",
-            ],
+    for lps, lpc in zip(label_ps, label_pc):
+        # Some columns are missing even if in CSV
+        if lps not in MISSING_COLS:
+            try:
+                ps_tbl.rename_column(lps, lpc)
+            except KeyError:
+                warn(f"Column {lps} was not found in PS table", RuntimeWarning)
+    # Ref time keys are mismatched in CSV so one will be missing, need to update
+    tper_ref = "pl_orbtper_systemref"
+    tranmid_ref = "pl_tranmid_systemref"
+    tsys_ref = "pl_tsystemref"
+    ps_tbl[tranmid_ref] = ps_tbl[tsys_ref]
+    ps_tbl[tper_ref] = ps_tbl[tsys_ref]
+
+    # Format references to match composite table format (masterfile default)
+    if verbose:
+        print("Formatting references to match composite table format...", end="")
+
+    reflink_labels = label_df_all.dropna(subset=PC_NAME)[PC_NAME]
+    reflink_labels = reflink_labels.str.strip()
+    reflink_labels= reflink_labels[reflink_labels.str.endswith("reflink")]
+    for rlab in reflink_labels:
+
+        plab = rlab.replace("_reflink", "")
+        if isinstance(ps_tbl[plab][0], str) or ps_tbl[plab].dtype.kind in ["U", "S"]:
+            nmask = ps_tbl[plab] == ""
+        else:
+            nmask = np.isnan(ps_tbl[plab])
+
+
+        if rlab.startswith("st_"):
+            new_refs = ps_tbl["st_refname"]
+        elif rlab.startswith(("sy_", "ra_")):
+            new_refs = ps_tbl["sy_refname"]
+        elif rlab.startswith("pl_"):
+            new_refs = ps_tbl["pl_refname"]
+        else:
+            warn(f"Reference {rlab} has no known match. Setting to ''.")
+            new_refs = ""
+
+        ps_tbl[rlab] = MaskedColumn(np.where(nmask, "", new_refs))
+
+    if verbose:
+        print("Done")
+
+    return ps_tbl
+
+
+def compose_from_ps(
+        ps_tbl,
+        sort_keys: Union[str, List[str]],
+        verbose: bool = False,
+    ):
+    # This creates a composite table, but using full rows instead of using the most precise
+    # for each parameter individually as (I think) done for NASA archive.
+
+    default_mask = ps_tbl["default_flag"] == 1
+    extended = ps_tbl[~default_mask]
+    ps_tbl = ps_tbl[default_mask]
+
+    # Add estimate of transit mid time error as of today
+    extended.estim_ephemeride_err()
+
+    # Add estimate of transit mid time error as of today
+    extended.estim_ephemeride_err(ephemeride="pl_orbtper")
+
+    # Sort to choose the reference accordingly
+    extended.sort(sort_keys)
+
+    # Separate bet
+    # Group by planet's name
+    grouped = extended.group_by(["pl_name"])
+
+    # Complete new table with extended table
+    if verbose:
+        print(
+            "Completing database with extended database (may take some time)...",
+            end="",
         )
+
+    # Fill all the values we can until nothing left or ps is completely filled
+    while len(grouped) > 1 and ps_tbl.has_masked_values:
+
+        # Groupe by planet name
+        grouped = grouped.group_by(["pl_name"])
+
+        # "index" gives the first entry for each planet
+        # (i.e. the star of each group where table is grouped by pl_name)
+        index = grouped.groups.indices[:-1]
+
+        # Add to master table
+        # NOTE: This assumes that reflink will be masked if the value is masked.
+        # Usually true, but would not hurt to check it somewhere
+        ps_tbl = ps_tbl.complete(
+            grouped[index], "pl_name", add_col=False, verbose=False
+        )
+
+        # Remove from the main table
+        grouped.remove_rows(index)
+
+    if verbose:
+        print("Done")
+
+    return ps_tbl
