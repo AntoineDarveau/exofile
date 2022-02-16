@@ -1,1 +1,1 @@
-include masterfile/*.yml masterfile/*.yaml
+include exofile/*.yml exofile/*.yaml

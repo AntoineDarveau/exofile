@@ -31,7 +31,7 @@ def get_refname_from_links(links):
     return [get_refname_from_link(link) for link in links]
 
 
-class MasterFile(Table):
+class ExoFile(Table):
 
     main_col = "pl_name"
 
@@ -50,7 +50,7 @@ class MasterFile(Table):
 
         # Initiate table with the same structure
         keys = self.keys()
-        out = MasterFile(
+        out = ExoFile(
             names=keys,
             dtype=["bytes" for k in keys],
             masked=True,
@@ -91,7 +91,7 @@ class MasterFile(Table):
         # Initiate table with the same structure
         keys = self.keys()
         mask = Table(self, copy=True, masked=True).mask
-        out = MasterFile(
+        out = ExoFile(
             names=keys, dtype=["bytes" for k in keys], masked=True, data=mask
         )
         # Remove units from column definition
@@ -174,7 +174,7 @@ class MasterFile(Table):
     @staticmethod
     def update(sort_keys=None, verbose=True):
         """
-        Returns an updated masterfile built with the NasaExoplanetArchive.
+        Returns an updated exofile built with the NasaExoplanetArchive.
 
         Parameters
         ----------
@@ -276,7 +276,7 @@ class MasterFile(Table):
         main_col = main_col or other.main_col
 
         # Make sure `other` is masked
-        other = MasterFile(other, copy=True, masked=True)
+        other = ExoFile(other, copy=True, masked=True)
 
         # Save units for conversion
         units = {}
@@ -323,14 +323,14 @@ class MasterFile(Table):
                     self[i_self][key] = other[i_other][key] * conversion
 
     @classmethod
-    def query(cls, url_key="url", debug=False, masterfile_kwargs=None, **kwargs):
+    def query(cls, url_key="url", debug=False, exofile_kwargs=None, **kwargs):
         """
-        Query the masterfile and try to complement it with
+        Query the exofile and try to complement it with
         the custom table (google sheet).
-        Returns the complemented masterfile.
+        Returns the complemented exofile.
         Parameters:
         - url: string
-            adress of the masterfile
+            adress of the exofile
         - url_key: string
             key to get the url from param file. Default is 'url'.
         - sheet_key: string
@@ -347,20 +347,20 @@ class MasterFile(Table):
             # Convert to table
             master = cls.read(master.text, format="ascii")
         except requests.exceptions.SSLError:
-            # If SSLError, maybe just the masterfile website is problem,
+            # If SSLError, maybe just the exofile website is problem,
             # still try local file and then google sheet for custom
             try:
-                master = cls.read(param["masterfile"], **masterfile_kwargs)
+                master = cls.read(param["exofile"], **exofile_kwargs)
             except Exception as e:
                 if debug == "raise":
                     raise e
-                warn(GetLocalFileWarning(file="masterfile", err=e))
+                warn(GetLocalFileWarning(file="exofile", err=e))
 
         # Try to complement with custom values
         try:
-            # Get custom values to be added to the masterfile
+            # Get custom values to be added to the exofile
             custom = GoogleSheet.query(param["sheet_key"], **kwargs)
-            # Replace values in the masterfile
+            # Replace values in the exofile
             master.replace_with(custom)
 
         except Exception as e:
@@ -377,23 +377,23 @@ class MasterFile(Table):
         param=None,
         debug=None,
         query_kwargs=None,
-        masterfile_kwargs=None,
+        exofile_kwargs=None,
         **kwargs,
     ):
         """
-        Returns the masterfile complemented.
+        Returns the exofile complemented.
         Parameters
         - param: dict
             dictionnairy of the local files names. Default is param file.
-            keys: 'masterfile' and 'custom_file'
-            `custom_file` will be use to replace values in the masterfile.
-            `masterfile` is the local masterfile.
+            keys: 'exofile' and 'custom_file'
+            `custom_file` will be use to replace values in the exofile.
+            `exofile` is the local exofile.
         - query: bool
-            query or not the masterfile. If False, simply read `custom_file`
+            query or not the exofile. If False, simply read `custom_file`
         - query_kwargs: None or dictionnary
             Passed to query() method
-        - masterfile_kwargs: None or dictionnary
-            Passed to table.read() when reading the local masterfile
+        - exofile_kwargs: None or dictionnary
+            Passed to table.read() when reading the local exofile
             (see astropy.table.read)
         - kwargs
             Passed to table.read() when reading the custom table
@@ -405,36 +405,36 @@ class MasterFile(Table):
             param = {}
         if query_kwargs is None:
             query_kwargs = {}
-        if masterfile_kwargs is None:
-            masterfile_kwargs = {}
+        if exofile_kwargs is None:
+            exofile_kwargs = {}
 
         # Use module parameters and complete with input parameters
         param = {**Param.load().value, **param}
 
         ###########################
-        # Complement the masterfile
+        # Complement the exofile
         ###########################
         # Query online if True
         if query:
-            # Try to query the complemented masterfile.
+            # Try to query the complemented exofile.
             # If impossible, set query to False
             try:
-                master = cls.query(**query_kwargs, masterfile_kwargs=masterfile_kwargs)
+                master = cls.query(**query_kwargs, exofile_kwargs=exofile_kwargs)
             except Exception as e:
                 if debug == "raise":
                     raise e
-                warn(QueryFileWarning(file="masterfile", err=e))
+                warn(QueryFileWarning(file="exofile", err=e))
                 query = False
 
-        # Read local masterfile if query is False or query failed
+        # Read local exofile if query is False or query failed
         if not query:
             # Try to read locally
             try:
-                master = cls.read(param["masterfile"], **masterfile_kwargs)
+                master = cls.read(param["exofile"], **exofile_kwargs)
             except Exception as e:
                 if debug == "raise":
                     raise e
-                warn(GetLocalFileWarning(file="masterfile", err=e))
+                warn(GetLocalFileWarning(file="exofile", err=e))
                 # Return custom_file as last ressort
                 return cls.read(param["custom_file"], **kwargs)
 
@@ -452,15 +452,15 @@ class MasterFile(Table):
     @classmethod
     def load_ref(cls, query=True, param=None, debug=None, **kwargs):
         """
-        Returns the masterfile reference table complemented.
+        Returns the exofile reference table complemented.
         Parameters
         - param: dict
             dictionnairy of the local files names. Default is param file.
-            keys: 'masterfile' and 'custom_file'
-            `custom_file` will be use to replace values in the masterfile.
-            `masterfile` is the local masterfile.
+            keys: 'exofile' and 'custom_file'
+            `custom_file` will be use to replace values in the exofile.
+            `exofile` is the local exofile.
         - query: bool
-            query or not the masterfile. If False, simply read `custom_file`
+            query or not the exofile. If False, simply read `custom_file`
         - kwargs are passed to query() method
         """
         # Assign default values
@@ -469,11 +469,11 @@ class MasterFile(Table):
         param = {**Param.load().value, **param}
 
         ###########################
-        # Complement the masterfile
+        # Complement the exofile
         ###########################
         # Query online if True
         if query:
-            # Try to query the complemented masterfile.
+            # Try to query the complemented exofile.
             # If impossible, set query to False
             try:
                 master = cls.query(
@@ -485,7 +485,7 @@ class MasterFile(Table):
                 warn(QueryFileWarning(file="reference file", err=e))
                 query = False
 
-        # Read local masterfile if query is False or query failed
+        # Read local exofile if query is False or query failed
         if not query:
             # Try to read locally
             try:
@@ -549,7 +549,7 @@ class MasterFile(Table):
         self.add_column(col)
 
 
-class GoogleSheet(MasterFile):
+class GoogleSheet(ExoFile):
 
     url_root = "https://docs.google.com/spreadsheets/d/{}/gviz/tq?tqx=out:csv&sheet={}"
 
@@ -580,7 +580,7 @@ class GoogleSheet(MasterFile):
         return table
 
 
-class BaseArchive(MasterFile):
+class BaseArchive(ExoFile):
 
     url_root = "http://exoplanetarchive.ipac.caltech.edu/cgi-bin/nstedAPI/nph-nstedAPI?"
 
