@@ -99,7 +99,7 @@ class Table(table.Table):
         else:
             raise TypeError("Input must be a Masked Table." +
                             "\n \t Set its mask to True before calling" +
-                            " (example: t = Table(t,masked=True)).")
+                            " (example: t = Table(t, masked=True, copy=False)).")
 
     def by_pl_name(self, *plName, name_key=None, remove=False):
         """

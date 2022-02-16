@@ -185,7 +185,14 @@ class ExoFile(Table):
                     self[i_self][key] = other[i_other][key] * conversion
 
     @classmethod
-    def query(cls, url_key="url", debug=False, exofile_kwargs=None, **kwargs):
+    def query(
+            cls,
+            url_key="url",
+            debug=False,
+            exofile_kwargs=None,
+            use_alt_file=False,
+            **kwargs
+        ):
         """
         Query the exofile and try to complement it with
         the custom table (google sheet).
@@ -203,6 +210,8 @@ class ExoFile(Table):
         # Use input arguments if given
         param = {**param, **kwargs.pop("param", {})}
 
+        alt_str = "_alt" if use_alt_file else ""
+
         try:
             # Get combined table
             master = requests.get(param[url_key])
@@ -212,11 +221,11 @@ class ExoFile(Table):
             # If SSLError, maybe just the exofile website is problem,
             # still try local file and then google sheet for custom
             try:
-                master = cls.read(param["exofile"], **exofile_kwargs)
+                master = cls.read(param[f"exofile{alt_str}"], **exofile_kwargs)
             except Exception as e:
                 if debug == "raise":
                     raise e
-                warn(GetLocalFileWarning(file="exofile", err=e))
+                warn(GetLocalFileWarning(file=f"exofile{alt_str}", err=e))
 
         # Try to complement with custom values
         try:
@@ -240,6 +249,7 @@ class ExoFile(Table):
         debug=None,
         query_kwargs=None,
         exofile_kwargs=None,
+        use_alt_file=False,
         **kwargs,
     ):
         """
@@ -257,6 +267,8 @@ class ExoFile(Table):
         - exofile_kwargs: None or dictionnary
             Passed to table.read() when reading the local exofile
             (see astropy.table.read)
+        - use_alt_file: bool
+            Use alternative exofile with the row-by-row composite table
         - kwargs
             Passed to table.read() when reading the custom table
             (see astropy.table.read)
@@ -273,6 +285,8 @@ class ExoFile(Table):
         # Use module parameters and complete with input parameters
         param = {**Param.load().value, **param}
 
+        alt_str = "_alt" if use_alt_file else ""
+
         ###########################
         # Complement the exofile
         ###########################
@@ -281,22 +295,27 @@ class ExoFile(Table):
             # Try to query the complemented exofile.
             # If impossible, set query to False
             try:
-                master = cls.query(**query_kwargs, exofile_kwargs=exofile_kwargs)
+                master = cls.query(
+                    **query_kwargs,
+                    url=f"url{alt_str}",
+                    exofile_kwargs=exofile_kwargs,
+                    use_alt_file=use_alt_file,
+                )
             except Exception as e:
                 if debug == "raise":
                     raise e
-                warn(QueryFileWarning(file="exofile", err=e))
+                warn(QueryFileWarning(file=f"exofile{alt_str}", err=e))
                 query = False
 
         # Read local exofile if query is False or query failed
         if not query:
             # Try to read locally
             try:
-                master = cls.read(param["exofile"], **exofile_kwargs)
+                master = cls.read(param[f"exofile{alt_str}"], **exofile_kwargs)
             except Exception as e:
                 if debug == "raise":
                     raise e
-                warn(GetLocalFileWarning(file="exofile", err=e))
+                warn(GetLocalFileWarning(file=f"exofile{alt_str}", err=e))
                 # Return custom_file as last ressort
                 return cls.read(param["custom_file"], **kwargs)
 
@@ -311,71 +330,23 @@ class ExoFile(Table):
 
         return master
 
-    @classmethod
-    def load_ref(cls, query=True, param=None, debug=None, **kwargs):
-        """
-        Returns the exofile reference table complemented.
-        Parameters
-        - param: dict
-            dictionnairy of the local files names. Default is param file.
-            keys: 'exofile' and 'custom_file'
-            `custom_file` will be use to replace values in the exofile.
-            `exofile` is the local exofile.
-        - query: bool
-            query or not the exofile. If False, simply read `custom_file`
-        - kwargs are passed to query() method
-        """
-        # Assign default values
-        if param is None:
-            param = {}  # Never put {} in the function definition
-        param = {**Param.load().value, **param}
+    def fill_custom_ref(self, default_ref="custom ref"):
 
-        ###########################
-        # Complement the exofile
-        ###########################
-        # Query online if True
-        if query:
-            # Try to query the complemented exofile.
-            # If impossible, set query to False
-            try:
-                master = cls.query(
-                    url_key="url_ref", sheet_name="Ref", keep_units=False
+        # Fill ref if not set by user
+        for col in self.colnames:
+            # Don't reflink the reflinks
+            if "_reflink" in col:
+                continue
+
+            rname = f"{col}_reflink"
+            if rname not in self.colnames and col != self.main_col:
+                self[rname] = MaskedColumn(
+                    data=[default_ref] * len(self), mask=self[col].mask
                 )
-            except Exception as e:
-                if debug == "raise":
-                    raise e
-                warn(QueryFileWarning(file="reference file", err=e))
-                query = False
 
-        # Read local exofile if query is False or query failed
-        if not query:
-            # Try to read locally
-            try:
-                master = cls.read(param["ref_file"])
-            except Exception as e:
-                if debug == "raise":
-                    raise e
-                warn(GetLocalFileWarning(file="reference file", err=e))
-                # Return 'custom ref' everywhere as last resort
-                custom = cls.read(param["custom_file"])
-                return custom.mk_unique_ref_table("custom ref")
+    def write_to_custom(self, *args, default_ref="custom ref", **kwargs):
 
-        # Finally, complement with the local `custom_file`
-        try:
-            # Read the file
-            custom = cls.read(param["custom_file"])
-            # Convert in a reference table
-            custom = custom.mk_unique_ref_table("custom ref")
-            # Edit master ref table
-            master.replace_with(custom)
-        except Exception as e:
-            if debug == "raise":
-                raise e
-            warn(GetLocalFileWarning(file="custom file", err=e))
-
-        return master
-
-    def write_to_custom(self, *args, **kwargs):
+        self.fill_custom_ref(default_ref=default_ref)
 
         file = Param.load().value["custom_file"]
         self.write(file, *args, **kwargs)
