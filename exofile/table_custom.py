@@ -141,7 +141,9 @@ class Table(table.Table):
                         + values
                     )
                 else:
-                    position.append(-1)
+                    raise ValueError(
+                        f"Unkonwn planet '{pl}'."
+                    )
         
         return position
     

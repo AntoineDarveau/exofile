@@ -12,6 +12,7 @@ masterfile_custom.ecsv
 exofile_custom.ecsv
 exofile_ref.ecsv
 exofile.ecsv
+exofile_alt.ecsv
 
 ################
 # Mac OS related
