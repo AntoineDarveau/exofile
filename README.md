@@ -28,7 +28,7 @@ Explanations:
 
 The resulting file is called _exofile.ecsv_ and can be used directly. It is also possible to complement this _exofile.ecsv_ with:
 
-3. a [google sheet](https://docs.google.com/spreadsheets/d/14Trm-AQ2eOphfwqJYrevnDrNVk56E-aH8yvRHQLjzWg/edit?usp=sharing)
+3. a [google sheet](https://docs.google.com/spreadsheets/d/1eAhWaff9mURg3TJ1Sp1VkAaMxeZEcKKs05w1kiGFVhs/edit?usp=sharing)
 4. a local custom table (default is _exofile_custom.csv_).
 
 To do so, simply use the following code:
