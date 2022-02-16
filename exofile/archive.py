@@ -215,11 +215,14 @@ class ExoFile(Table):
         try:
             # Get combined table
             master = requests.get(param[url_key])
+            master.raise_for_status()
             # Convert to table
             master = cls.read(master.text, format="ascii")
-        except requests.exceptions.SSLError:
-            # If SSLError, maybe just the exofile website is problem,
+        except (requests.exceptions.SSLError, requests.exceptions.HTTPError):
+            # If SSLError or HTTPError, maybe just the exofile website is problem,
             # still try local file and then google sheet for custom
+            # Handling this here allows using the Google sheet even if online exofile
+            # not available
             try:
                 master = cls.read(param[f"exofile{alt_str}"], **exofile_kwargs)
             except Exception as e:
@@ -297,7 +300,7 @@ class ExoFile(Table):
             try:
                 master = cls.query(
                     **query_kwargs,
-                    url=f"url{alt_str}",
+                    url_key=f"url{alt_str}",
                     exofile_kwargs=exofile_kwargs,
                     use_alt_file=use_alt_file,
                 )
