@@ -1,5 +1,8 @@
 from warnings import warn
+
 import numpy as np
+from astropy.uncertainty.core import NdarrayDistribution
+
 from exofile.archive import load_exoplanet_archive_mappings, ExoArchive, difference
 from exofile.table_custom import MaskedColumn
 
@@ -64,3 +67,43 @@ def migrate_table(old_tbl, old_ref):
     new_tbl = old_tbl[pc_cols]
 
     return new_tbl
+
+
+def get_tp_from_tau(
+        tau, per, tref, return_dist=False
+    ):
+    """
+    Get time of periastron from period, "tau" parameter and a reference time.
+
+    The tau parameter, sometimes labeled "chi", is tau = (tref - tp) / per
+    where tref is a reference time (usually the first obseravtion time).
+
+    This function is provided as a utility because many references provide only tau
+    and exofile does not support this parameter (nor does the NASA exoplanet archive).
+
+    :param tau: Periastron reference parameter
+    :type tau: Union[NdarrayDistribution, float]
+    :param per: Orbit period
+    :type per: Union[NdarrayDistribution, float]
+    :param tref: Reference time to calculate tp
+    :type tref: float
+    :param return_dist: Whether an astropy distribution should be returned, defaults to False
+    :type return_dist: bool, optional
+    """
+
+    has_err = isinstance(tau, NdarrayDistribution) or isinstance(per, NdarrayDistribution)
+
+    tp = tref - tau * per
+
+    if return_dist and has_err:
+        return tp
+    elif return_dist:
+        warn(
+            "Cannot return a distribution because inputs are not astropy distributions."
+            " Returning a scalar."
+        )
+        return tp
+    elif has_err:
+        return (tp.pdf_mean(), tp.pdf_std())
+    else:
+        return tp
