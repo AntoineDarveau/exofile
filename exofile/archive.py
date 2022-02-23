@@ -127,7 +127,7 @@ class ExoFile(Table):
                 if imask.any():
                     self[col].mask[imask] = True
 
-    def replace_with(self, other, main_col=None):
+    def replace_with(self, other, main_col=None, warn_units=True):
         """
         Use all non-masked values of `other` to replace values in `self`.
         `key` is the column use to identify corresponding rows.
@@ -145,7 +145,7 @@ class ExoFile(Table):
         for key in other.keys():
             units[key] = self[key].unit
             # Check if they are the same
-            if other[key].unit != units[key]:
+            if other[key].unit != units[key] and warn_units:
                 if other[key].unit is None:
                     other[key].unit = units[key]
                     warn(NoUnitsWarning(key, units[key]))
@@ -191,6 +191,8 @@ class ExoFile(Table):
             debug=False,
             exofile_kwargs=None,
             use_alt_file=False,
+            warn_units=True,
+            warn_local_file=True,
             **kwargs
         ):
         """
@@ -204,6 +206,12 @@ class ExoFile(Table):
             key to get the url from param file. Default is 'url'.
         - sheet_key: string
             Identification key of the google sheet
+        - use_alt_file: bool
+            Use alternative exofile with the row-by-row composite table
+        - warn_units: bool
+            Warn about unit conversions when replace values from custom file
+        - warn_local_file: bool
+            Warn about missing local file (set to false if not local file is expected)
         """
         # Get links to query the different database
         param = Param.load().value
@@ -226,16 +234,17 @@ class ExoFile(Table):
             try:
                 master = cls.read(param[f"exofile{alt_str}"], **exofile_kwargs)
             except Exception as e:
-                if debug == "raise":
-                    raise e
-                warn(GetLocalFileWarning(file=f"exofile{alt_str}", err=e))
+                if warn_local_file:
+                    if debug == "raise":
+                        raise e
+                    warn(GetLocalFileWarning(file=f"exofile{alt_str}", err=e))
 
         # Try to complement with custom values
         try:
             # Get custom values to be added to the exofile
             custom = GoogleSheet.query(param["sheet_key"], **kwargs)
             # Replace values in the exofile
-            master.replace_with(custom)
+            master.replace_with(custom, warn_units=warn_units)
 
         except Exception as e:
             if debug:
@@ -253,6 +262,8 @@ class ExoFile(Table):
         query_kwargs=None,
         exofile_kwargs=None,
         use_alt_file=False,
+        warn_units=True,
+        warn_local_file=True,
         **kwargs,
     ):
         """
@@ -272,6 +283,10 @@ class ExoFile(Table):
             (see astropy.table.read)
         - use_alt_file: bool
             Use alternative exofile with the row-by-row composite table
+        - warn_units: bool
+            Warn about unit conversions when replace values from custom file
+        - warn_local_file: bool
+            Warn about missing local file (set to false if not local file is expected)
         - kwargs
             Passed to table.read() when reading the custom table
             (see astropy.table.read)
@@ -303,6 +318,8 @@ class ExoFile(Table):
                     url_key=f"url{alt_str}",
                     exofile_kwargs=exofile_kwargs,
                     use_alt_file=use_alt_file,
+                    warn_units=warn_units,
+                    warn_local_file=warn_local_file,
                 )
             except Exception as e:
                 if debug == "raise":
@@ -316,20 +333,22 @@ class ExoFile(Table):
             try:
                 master = cls.read(param[f"exofile{alt_str}"], **exofile_kwargs)
             except Exception as e:
-                if debug == "raise":
-                    raise e
-                warn(GetLocalFileWarning(file=f"exofile{alt_str}", err=e))
-                # Return custom_file as last ressort
-                return cls.read(param["custom_file"], **kwargs)
+                if warn_local_file:
+                    if debug == "raise":
+                        raise e
+                    warn(GetLocalFileWarning(file=f"exofile{alt_str}", err=e))
+                    # Return custom_file as last ressort
+                    return cls.read(param["custom_file"], **kwargs)
 
         # Finally, complement with the local `custom_file`
         try:
             custom = cls.read(param["custom_file"], **kwargs)
-            master.replace_with(custom)
+            master.replace_with(custom, warn_units=warn_units)
         except Exception as e:
-            if debug == "raise":
-                raise e
-            warn(GetLocalFileWarning(file="custom file", err=e))
+            if warn_local_file:
+                if debug == "raise":
+                    raise e
+                warn(GetLocalFileWarning(file="custom file", err=e))
 
         return master
 
