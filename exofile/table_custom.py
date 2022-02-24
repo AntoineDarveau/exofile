@@ -95,7 +95,7 @@ class Table(table.Table):
         if self.masked:
             for k in self.keys():
                 if self[k].dtype == float:
-                    self[k].mask = np.isnan(self[k])
+                    self[k].mask = np.isnan(self[k]) | self[k].mask
         else:
             raise TypeError("Input must be a Masked Table." +
                             "\n \t Set its mask to True before calling" +
