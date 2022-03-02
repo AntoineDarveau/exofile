@@ -25,6 +25,36 @@ class NoUnitsWarning(UnitsWarning):
         super().__init__(message)
 
 
+class MultipleResultsWarning(UserWarning):
+
+    def __init__(self, input_value, results):
+
+        message = f"Multiple values where found for {input_value}: "
+        message += ', '.join([f'{name}' for name in results])
+
+        super().__init__(message)
+
+
+class NotFoundWarning(UserWarning):
+
+    def __init__(self, *input_values):
+
+        message = f"No value was found for "
+        message += ', '.join([f'{name}' for name in input_values])
+
+        super().__init__(message)
+
+
+class NotFoundError(ValueError):
+
+    def __init__(self, *input_values):
+
+        message = f"No value or multiple values were found for: "
+        message += ', '.join([f'{name}' for name in input_values])
+
+        super().__init__(message)
+
+
 class BaseFileWarning(UserWarning):
 
     def __init__(self, message, file=None, err=None):
