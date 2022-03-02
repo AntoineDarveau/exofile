@@ -7,6 +7,7 @@ from astropy.table.operations import _join, _merge_table_meta
 from astropy.units import Unit
 import numpy as np
 from astropy.coordinates import SkyCoord
+from .exceptions import MultipleResultsWarning, NotFoundWarning, NotFoundError
 
 
 class MaskedColumn(table.MaskedColumn):
@@ -101,17 +102,19 @@ class Table(table.Table):
                             "\n \t Set its mask to True before calling" +
                             " (example: t = Table(t, masked=True, copy=False)).")
 
-    def by_pl_name(self, *plName, name_key=None, remove=False):
+    def by_pl_name(self, *plName, name_key=None):
         """
         Return the complete line of a given planet name (plName)
         """
         position = self.get_index(*plName, name_key=name_key)
+        position = np.array(position)
 
-        out = self[position]
+        is_valid = (position >= 0)
 
-        if remove and len(position) == 1:
-            print(str(*plName) + ' has been removed')
-            self.remove_row(int(position[0]))
+        if is_valid.any():
+            out = self[position[is_valid]]
+        else:
+            raise NotFoundError(*plName)
 
         return out
 
@@ -135,17 +138,13 @@ class Table(table.Table):
                 position.append(int(self[name_key].find(pl)[0]))
 
             except TypeError:
-                values = ', '.join(self[name_key].find(pl)[1])
-                if values:
-                    raise ValueError(
-                        'Incomplete name. Possible values: '
-                        + values
-                    )
+                values = self[name_key].find(pl)[1]
+                if len(values) > 0:
+                    warn(MultipleResultsWarning(pl, values))
                 else:
-                    raise ValueError(
-                        f"Unkonwn planet '{pl}'."
-                    )
-        
+                    warn(NotFoundWarning(pl))
+                position.append(-1)
+
         return position
 
     def set_main_col(self, colname=None, extension='_temp'):
