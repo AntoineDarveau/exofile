@@ -82,6 +82,13 @@ class Table(table.Table):
     main_col = None  # Default column used to order
     log = []  # Save output when using insert_value method
 
+    def __init__(self, *args, masked=True, **kwargs):
+
+        super().__init__(*args, masked=masked, **kwargs)
+
+        if self.masked:
+            self.nan_to_mask()
+
     # New methods
     def rename_columns(self, old, new):
 
