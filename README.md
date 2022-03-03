@@ -20,28 +20,28 @@ Concept
 The idea is to make the most complete table as possible.
 Here is a scheme of the concept:
 
-![Concept_scheme](schema.png)
+![Concept_scheme](schema_exofile.png)
 
-Explanations:
-1. The [Confirmed Planet Table](https://exoplanetarchive.ipac.caltech.edu/docs/API_exoplanet_columns.html) is used to fill the exofile.
-2. Then, the [Extended Planet Table](https://exoplanetarchive.ipac.caltech.edu/docs/API_exomultpars_columns.html) is used to fill the missing values. The references are sorted according to the error on the orbital period (this could be changed). All the values from a particular reference are used to keep a minimum of consistency.
+Explanations
+Two files can be load using `ExoFile.load()`
+- __Default__ The [Composite Planetary Systems Table](https://exoplanetarchive.ipac.caltech.edu/docs/pscp_about.html), directly taken from the archive with minor formating.
+- __Alternative__ The [Planetary Systems Table](https://exoplanetarchive.ipac.caltech.edu/docs/API_PS_columns.html) is used to build a _exofile_alt.ecsv_. The references are sorted according to the error on the ephemeride at the present date (this could be changed or improved). All the values from the best reference are used iteratively to fill missing values in the table for the sake of consistency.
 
-The resulting file is called _exofile.ecsv_ and can be used directly. It is also possible to complement this _exofile.ecsv_ with:
+The resulting file is called _exofile.ecsv_ or _exofile_alt.ecsv_ and can be used directly. It is also possible to complement this _exofile.ecsv_ with:
 
-3. a [google sheet](https://docs.google.com/spreadsheets/d/1eAhWaff9mURg3TJ1Sp1VkAaMxeZEcKKs05w1kiGFVhs/edit?usp=sharing)
+3. a crowdsourced [google sheet](https://docs.google.com/spreadsheets/d/1eAhWaff9mURg3TJ1Sp1VkAaMxeZEcKKs05w1kiGFVhs/edit?usp=sharing)
 4. a local custom table (default is _exofile_custom.csv_).
 
 To do so, simply use the following code:
 ``` python
 from exofile.archive import ExoFile
-data = ExoFile.load()
+data = ExoFile.load()  # or ExoFile.load(use_alt_file=True) for the alternative
 ```
 `data` is an instance of `ExoFile` which is inheriting from [astropy.table.Table](https://docs.astropy.org/en/stable/table/access_table.html) class (so it has the same behaviour).
 
 _NOTE: The Confirmed and Exteneded Planet Tables were retired from the archive
 in August 2021. Versions of exofile using these tables are therefore out of
-date. We are currently working on an update to make exofile compatible with the
-latest NASA Archive tables_
+date._
 
 Installation
 -----
