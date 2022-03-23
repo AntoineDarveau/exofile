@@ -102,7 +102,7 @@ class Table(table.Table):
         """
         if self.masked:
             for k in self.keys():
-                if self[k].dtype == float:
+                if not isinstance(self[k], SkyCoord) and self[k].dtype == float:
                     self[k].mask = np.isnan(self[k]) | self[k].mask
         else:
             raise TypeError("Input must be a Masked Table." +
