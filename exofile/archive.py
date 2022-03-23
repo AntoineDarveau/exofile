@@ -457,7 +457,7 @@ class ExoFile(Table):
             new = new[pc_cols]
 
             # Safety check
-            if len(difference(new.colnames, pc_cols)) > 0 or len(difference(pc_cols, new.colnames)):
+            if len(difference(new.colnames, pc_cols)) > 0 or len(difference(pc_cols, new.colnames)) > 0:
                 raise RuntimeError(
                     f"The formatted {tbl_id} table is incompatible with the masterfile/composite table format"
                 )
