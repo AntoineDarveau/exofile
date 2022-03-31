@@ -426,7 +426,7 @@ class ExoFile(Table):
             sort_keys = ["today_pl_tranmiderr1", "today_pl_orbtpererr1", "pl_massj", "pl_radj"]
             
         if bad_ref_list is None:
-            bad_ref_list = ['Bonomo et al. 2017', 'Stassun et al. 2017']
+            bad_ref_list = ['ExoFOP-TESS TOI', 'Bonomo et al. 2017', 'Stassun et al. 2017']
 
         # Read new database from exoplanet archive
         if use_composite_archive:
@@ -632,11 +632,7 @@ def format_ps_table(
     for rlab in reflink_labels:
 
         plab = rlab.replace("_reflink", "")
-        if isinstance(ps_tbl[plab][0], str) or ps_tbl[plab].dtype.kind in ["U", "S"]:
-            nmask = ps_tbl[plab] == ""
-        else:
-            nmask = np.isnan(ps_tbl[plab])
-
+        nmask = ps_tbl[plab].mask
 
         if rlab.startswith("st_"):
             new_refs = ps_tbl["st_refname"]
@@ -648,7 +644,7 @@ def format_ps_table(
             warn(f"Reference {rlab} has no known match. Setting to ''.")
             new_refs = ""
 
-        ps_tbl[rlab] = MaskedColumn(np.where(nmask, "", new_refs))
+        ps_tbl[rlab] = MaskedColumn(new_refs, mask=nmask)
 
     if verbose:
         print("Done")
@@ -698,9 +694,13 @@ def compose_from_ps(
         default_mask = ps_tbl["default_flag"] == 1
         extended = ps_tbl[~default_mask]
         ps_tbl = ps_tbl[default_mask]
+        if verbose:
+            print("Using default flag as first priority.")
     else:
         extended = ps_tbl
         ps_tbl = None
+        if verbose:
+            print("Using best reference as first priority.")
 
     # Add estimate of transit mid time error as of today
     extended.estim_ephemeride_err()
