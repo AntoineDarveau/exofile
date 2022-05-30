@@ -7,12 +7,13 @@ import numpy as np
 import requests
 from astropy.time import Time
 from astropy.units import Unit
+from astropy.table import vstack
 from astroquery.ipac.nexsci.nasa_exoplanet_archive import NasaExoplanetArchive
 from pandas import read_csv, DataFrame
 
 from .config import Param
 from .exceptions import (ColUnitsWarning, GetLocalFileWarning, NoUnitsWarning,
-                         QueryFileWarning)
+                         QueryFileWarning, NotFoundWarning)
 from .table_custom import MaskedColumn, Table, difference
 
 
@@ -397,7 +398,7 @@ class ExoFile(Table):
         tranmid_err = self[ephemeride + err_ext].to_array(units="d")
 
         # Compute error as of today
-        error_today = tranmid_err + n_period * orbper_err
+        error_today = np.sqrt(tranmid_err**2 + (n_period * orbper_err)**2)
 
         # Save as a column
         col = MaskedColumn(error_today, unit="d", name=f"today_{ephemeride}{err_ext}")
@@ -406,6 +407,7 @@ class ExoFile(Table):
     @staticmethod
     def update(
             sort_keys: Optional[Union[str, List[str]]] = None,
+            bad_ref_list: Optional[List[str]] = None,
             verbose: bool = True,
             use_composite_archive: bool = True,
             local_table: Optional[Union[str, Path]] = None,
@@ -421,7 +423,10 @@ class ExoFile(Table):
         """
         # Default sort keys
         if sort_keys is None:
-            sort_keys = ["today_pl_tranmiderr1", "today_pl_orbtpererr1"]
+            sort_keys = ["today_pl_tranmiderr1", "today_pl_orbtpererr1", "pl_massj", "pl_radj"]
+            
+        if bad_ref_list is None:
+            bad_ref_list = ['ExoFOP-TESS TOI', 'Bonomo et al. 2017', 'Stassun et al. 2017']
 
         # Read new database from exoplanet archive
         if use_composite_archive:
@@ -443,7 +448,7 @@ class ExoFile(Table):
 
         if not use_composite_archive:
             new = format_ps_table(new, verbose=verbose)
-            new = compose_from_ps(new, sort_keys, verbose=verbose)
+            new = compose_from_ps(new, sort_keys, bad_ref_list=bad_ref_list, verbose=verbose)
 
             # Get actual pc columns to compare with what's left.
             # Using CSV from Archive deletes too many columns
@@ -627,11 +632,7 @@ def format_ps_table(
     for rlab in reflink_labels:
 
         plab = rlab.replace("_reflink", "")
-        if isinstance(ps_tbl[plab][0], str) or ps_tbl[plab].dtype.kind in ["U", "S"]:
-            nmask = ps_tbl[plab] == ""
-        else:
-            nmask = np.isnan(ps_tbl[plab])
-
+        nmask = ps_tbl[plab].mask
 
         if rlab.startswith("st_"):
             new_refs = ps_tbl["st_refname"]
@@ -643,7 +644,7 @@ def format_ps_table(
             warn(f"Reference {rlab} has no known match. Setting to ''.")
             new_refs = ""
 
-        ps_tbl[rlab] = MaskedColumn(np.where(nmask, "", new_refs))
+        ps_tbl[rlab] = MaskedColumn(new_refs, mask=nmask)
 
     if verbose:
         print("Done")
@@ -651,17 +652,55 @@ def format_ps_table(
     return ps_tbl
 
 
+def downgrade_references(table, refname_list, key_reference='pl_refname'):
+    """ Put references in last priority, so at the bottom of the table"""
+
+    # Don't modify out_table directly
+    out_table = table.copy()
+    
+    for refname in refname_list:
+
+        # Find all rows from reference
+        idx_reference = out_table[key_reference].find(refname)[0]
+        
+        if idx_reference.any():
+
+            # Create out_table with them
+            table_bad_ref = out_table[idx_reference]
+
+            # Remove from out_table
+            out_table.remove_rows(idx_reference)
+
+            # Put it back at the bottom
+            out_table = vstack([out_table, table_bad_ref])
+            out_table = table.__class__(out_table, masked=True, copy=False)
+        else:
+            warn(NotFoundWarning(refname))
+
+    return out_table
+
+
 def compose_from_ps(
         ps_tbl,
         sort_keys: Union[str, List[str]],
+        bad_ref_list: Optional[List[str]] = None,
+        use_default: bool = False,
         verbose: bool = False,
     ):
     # This creates a composite table, but using full rows instead of using the most precise
     # for each parameter individually as (I think) done for NASA archive.
 
-    default_mask = ps_tbl["default_flag"] == 1
-    extended = ps_tbl[~default_mask]
-    ps_tbl = ps_tbl[default_mask]
+    if use_default:
+        default_mask = ps_tbl["default_flag"] == 1
+        extended = ps_tbl[~default_mask]
+        ps_tbl = ps_tbl[default_mask]
+        if verbose:
+            print("Using default flag as first priority.")
+    else:
+        extended = ps_tbl
+        ps_tbl = None
+        if verbose:
+            print("Using best reference as first priority.")
 
     # Add estimate of transit mid time error as of today
     extended.estim_ephemeride_err()
@@ -671,10 +710,23 @@ def compose_from_ps(
 
     # Sort to choose the reference accordingly
     extended.sort(sort_keys)
+    
+    # Put bad references at last priority
+    if bad_ref_list is not None:
+        extended = downgrade_references(extended, bad_ref_list)
 
     # Separate bet
     # Group by planet's name
     grouped = extended.group_by(["pl_name"])
+
+    # Init the table with the most precise if default reference not used
+    if ps_tbl is None:
+        # "index" gives the first entry for each planet
+        # (i.e. the star of each group where table is grouped by pl_name)
+        index = grouped.groups.indices[:-1]
+        ps_tbl = ExoFile(grouped[index])
+        # Remove from the main table
+        grouped.remove_rows(index)
 
     # Complete new table with extended table
     if verbose:
